@@ -2,13 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-
-interface Sensor {
-  id: number
-  name: string
-  type: string
-  locationId: number
-}
+import type { Sensor } from '@/lib/locations'
 
 interface DataAcquisitionProps {
   sensors: Sensor[]

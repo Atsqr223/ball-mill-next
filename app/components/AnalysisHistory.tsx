@@ -31,12 +31,10 @@ interface Analysis {
     endTime: string | null;
     status: string;
   };
-  data: {
-    id: number;
+  data: Array<{
     value: number;
     timestamp: string;
-    analysisResults: any;
-  }[];
+  }>;
 }
 
 interface AnalysisHistoryProps {
@@ -49,7 +47,7 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
   if (analyses.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6 text-center">
-        <p className="text-gray-500">No analyses available</p>
+        <p className="text-gray-500">No analysis history available</p>
       </div>
     );
   }
@@ -84,28 +82,35 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
             }`}
           >
             <div className="flex justify-between items-start mb-2">
-              <span className="font-medium">
-                Session #{analysis.session.id}
-              </span>
+              <div>
+                <h3 className="font-medium">
+                  Session #{analysis.session.id}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {new Date(analysis.session.startTime).toLocaleString()}
+                </p>
+              </div>
               <span
-                className={`px-2 py-1 rounded text-sm ${
-                  analysis.session.status === 'active'
+                className={`px-2 py-1 text-xs rounded-full ${
+                  analysis.session.status === 'completed'
                     ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
+                    : 'bg-yellow-100 text-yellow-800'
                 }`}
               >
                 {analysis.session.status}
               </span>
             </div>
             <div className="text-sm text-gray-600">
-              <p>Data Points: {analysis.session.numDataPoints}</p>
-              <p>
-                Started:{' '}
-                {new Date(analysis.session.startTime).toLocaleString()}
-              </p>
+              <p>Data points: {analysis.session.numDataPoints}</p>
               {analysis.session.endTime && (
                 <p>
-                  Ended: {new Date(analysis.session.endTime).toLocaleString()}
+                  Duration:{' '}
+                  {Math.round(
+                    (new Date(analysis.session.endTime).getTime() -
+                      new Date(analysis.session.startTime).getTime()) /
+                      1000
+                  )}{' '}
+                  seconds
                 </p>
               )}
             </div>

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { locations } from '@/lib/locations';
 import { db } from '@/lib/db';
-import { sensors, acquisitionSessions, sensorData } from '@/lib/schema';
+import { acquisitionSessions, sensorData } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import LiveStream from '@/app/components/LiveStream';
 import DataAcquisition from '@/app/components/DataAcquisition';
@@ -11,18 +11,6 @@ async function getLocation(id: number) {
   const location = locations.find(loc => loc.id === id);
   if (!location) return null;
   return location;
-}
-
-async function getLocationSensors(locationId: number) {
-  try {
-    return await db
-      .select()
-      .from(sensors)
-      .where(eq(sensors.locationId, locationId));
-  } catch (error) {
-    console.error('Failed to fetch sensors:', error);
-    return [];
-  }
 }
 
 async function getRecentAnalyses(locationId: number) {
@@ -36,11 +24,29 @@ async function getRecentAnalyses(locationId: number) {
 
     const analyses = await Promise.all(
       sessions.map(async (session) => {
-        const data = await db
-          .select()
+        const rawData = await db
+          .select({
+            value: sensorData.value,
+            timestamp: sensorData.timestamp,
+          })
           .from(sensorData)
           .where(eq(sensorData.sessionId, session.id));
-        return { session, data };
+
+        const data = rawData.map(item => ({
+          value: item.value,
+          timestamp: item.timestamp.toISOString(),
+        }));
+
+        return {
+          session: {
+            id: session.id,
+            numDataPoints: data.length,
+            startTime: session.startTime.toISOString(),
+            endTime: session.endTime?.toISOString() || null,
+            status: session.status,
+          },
+          data,
+        };
       })
     );
 
@@ -63,7 +69,6 @@ export default async function LocationPage({
     notFound();
   }
 
-  const sensors = await getLocationSensors(locationId);
   const recentAnalyses = await getRecentAnalyses(locationId);
 
   return (
@@ -90,7 +95,7 @@ export default async function LocationPage({
           <h2 className="text-2xl font-semibold mb-4">Data Acquisition</h2>
           <DataAcquisition
             locationId={locationId}
-            sensors={sensors}
+            sensors={location.sensors}
           />
         </div>
       </div>
