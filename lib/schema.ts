@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, timestamp, integer, doublePrecision, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core'
+import { pgTable, serial, varchar, timestamp, integer, doublePrecision, jsonb, index, uniqueIndex, real, text } from 'drizzle-orm/pg-core'
 
 export const locations = pgTable('locations', {
   id: serial('id').primaryKey(),
@@ -12,9 +12,11 @@ export const locations = pgTable('locations', {
 export const sensors = pgTable('sensors', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
-  type: varchar('type', { length: 50 }).notNull(),
+  type: varchar('type', { length: 50 }).notNull(), // 'LD', 'ACCELEROMETER', 'RADAR'
   locationId: integer('location_id').references(() => locations.id).notNull(),
   status: varchar('status', { length: 50 }).notNull().default('active'),
+  configuration: jsonb('configuration'), // Sensor-specific configuration
+  description: text('description'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
@@ -31,6 +33,7 @@ export const acquisitionSessions = pgTable('acquisition_sessions', {
   fileName: varchar('file_name', { length: 255 }),
   startTime: timestamp('start_time').notNull(),
   endTime: timestamp('end_time'),
+  metadata: jsonb('metadata'), // Additional session metadata
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
@@ -43,13 +46,23 @@ export const sensorData = pgTable('sensor_data', {
   id: serial('id').primaryKey(),
   sessionId: integer('session_id').references(() => acquisitionSessions.id).notNull(),
   sensorId: integer('sensor_id').references(() => sensors.id).notNull(),
-  value: integer('value').notNull(),
+  sampleIndex: integer('sample_index').notNull(),
+  // LD Sensor data
+  voltage: real('voltage'),
+  // Accelerometer data
+  accelerationX: real('acceleration_x'),
+  accelerationY: real('acceleration_y'),
+  accelerationZ: real('acceleration_z'),
+  // Radar data
+  distance: real('distance'),
   timestamp: timestamp('timestamp').notNull(),
+  metadata: jsonb('metadata'), // Additional measurement metadata
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   sessionIdx: index('sensor_data_session_idx').on(table.sessionId),
   sensorIdx: index('sensor_data_sensor_idx').on(table.sensorId),
   timestampIdx: index('sensor_data_timestamp_idx').on(table.timestamp),
+  sampleIdx: index('sensor_data_sample_idx').on(table.sampleIndex),
 }))
 
 export const ballMillPositions = pgTable('ball_mill_positions', {
@@ -63,4 +76,4 @@ export const ballMillPositions = pgTable('ball_mill_positions', {
 }, (table) => ({
   locationIdx: index('ball_mill_positions_location_idx').on(table.locationId),
   timestampIdx: index('ball_mill_positions_timestamp_idx').on(table.timestamp),
-})) 
+}))

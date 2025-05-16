@@ -23,6 +23,18 @@ ChartJS.register(
   Legend
 );
 
+interface SensorReading {
+  sampleIndex: number;
+  timestamp: string;
+  value?: number;
+  voltage?: number;
+  x?: number;
+  y?: number;
+  z?: number;
+  distance?: number;
+  unit?: string;
+}
+
 interface Analysis {
   session: {
     id: number;
@@ -30,11 +42,10 @@ interface Analysis {
     startTime: string;
     endTime: string | null;
     status: string;
+    sensorType: string;
+    metadata: Record<string, any>;
   };
-  data: Array<{
-    value: number;
-    timestamp: string;
-  }>;
+  data: SensorReading[];
 }
 
 interface AnalysisHistoryProps {
@@ -52,21 +63,66 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
     );
   }
 
-  const chartData = selectedAnalysis
-    ? {
-        labels: selectedAnalysis.data.map((d) =>
-          new Date(d.timestamp).toLocaleTimeString()
-        ),
-        datasets: [
-          {
-            label: 'Sensor Data',
-            data: selectedAnalysis.data.map((d) => d.value),
-            borderColor: 'rgb(75, 192, 192)',
-            tension: 0.1,
-          },
-        ],
-      }
-    : null;
+  const getChartData = (analysis: Analysis) => {
+    const labels = analysis.data.map((d) =>
+      new Date(d.timestamp).toLocaleTimeString()
+    );
+
+    switch (analysis.session.sensorType) {
+      case 'LD':
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Voltage (V)',
+              data: analysis.data.map((d) => d.voltage),
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+            },
+          ],
+        };
+      case 'ACCELEROMETER':
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'X Acceleration (m/s²)',
+              data: analysis.data.map((d) => d.x),
+              borderColor: 'rgb(255, 99, 132)',
+              tension: 0.1,
+            },
+            {
+              label: 'Y Acceleration (m/s²)',
+              data: analysis.data.map((d) => d.y),
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+            },
+            {
+              label: 'Z Acceleration (m/s²)',
+              data: analysis.data.map((d) => d.z),
+              borderColor: 'rgb(153, 102, 255)',
+              tension: 0.1,
+            },
+          ],
+        };
+      case 'RADAR':
+        return {
+          labels,
+          datasets: [
+            {
+              label: 'Distance (m)',
+              data: analysis.data.map((d) => d.distance),
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+            },
+          ],
+        };
+      default:
+        return null;
+    }
+  };
+
+  const chartData = selectedAnalysis ? getChartData(selectedAnalysis) : null;
 
   return (
     <div className="space-y-6">
@@ -89,6 +145,9 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
                 <p className="text-sm text-gray-500">
                   {new Date(analysis.session.startTime).toLocaleString()}
                 </p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Sensor Type: {analysis.session.sensorType}
+                </p>
               </div>
               <span
                 className={`px-2 py-1 text-xs rounded-full ${
@@ -100,8 +159,8 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
                 {analysis.session.status}
               </span>
             </div>
-            <div className="text-sm text-gray-600">
-              <p>Data points: {analysis.session.numDataPoints}</p>
+            <div className="text-sm text-gray-500">
+              <p>{analysis.session.numDataPoints} data points</p>
               {analysis.session.endTime && (
                 <p>
                   Duration:{' '}
@@ -120,37 +179,40 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
 
       {selectedAnalysis && chartData && (
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">
-            Analysis Results - Session #{selectedAnalysis.session.id}
+          <h3 className="text-lg font-medium mb-4">
+            Session #{selectedAnalysis.session.id} Data
           </h3>
-          <div className="h-80">
+          <div className="h-96">
             <Line
               data={chartData}
               options={{
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                  legend: {
-                    position: 'top' as const,
-                  },
                   title: {
                     display: true,
-                    text: 'Sensor Data Over Time',
+                    text: `${selectedAnalysis.session.sensorType} Sensor Data`,
+                  },
+                },
+                scales: {
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Time',
+                    },
+                  },
+                  y: {
+                    title: {
+                      display: true,
+                      text: selectedAnalysis.data[0]?.unit || 'Value',
+                    },
                   },
                 },
               }}
             />
           </div>
-          {selectedAnalysis.data[0]?.analysisResults && (
-            <div className="mt-4">
-              <h4 className="font-medium mb-2">Analysis Results:</h4>
-              <pre className="bg-gray-50 p-4 rounded-lg overflow-auto">
-                {JSON.stringify(selectedAnalysis.data[0].analysisResults, null, 2)}
-              </pre>
-            </div>
-          )}
         </div>
       )}
     </div>
   );
-} 
+}

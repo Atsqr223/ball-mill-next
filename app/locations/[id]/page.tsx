@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { locations } from '@/lib/locations';
 import { db } from '@/lib/db';
-import { acquisitionSessions, sensorData } from '@/lib/schema';
+import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import LiveStream from '@/app/components/LiveStream';
 import DataAcquisition from '@/app/components/DataAcquisition';
@@ -16,7 +16,14 @@ async function getLocation(id: number) {
 async function getRecentAnalyses(locationId: number) {
   try {
     const sessions = await db
-      .select()
+      .select({
+        id: acquisitionSessions.id,
+        startTime: acquisitionSessions.startTime,
+        endTime: acquisitionSessions.endTime,
+        status: acquisitionSessions.status,
+        metadata: acquisitionSessions.metadata,
+        sensorId: acquisitionSessions.sensorId,
+      })
       .from(acquisitionSessions)
       .where(eq(acquisitionSessions.locationId, locationId))
       .orderBy(acquisitionSessions.createdAt)
@@ -24,18 +31,51 @@ async function getRecentAnalyses(locationId: number) {
 
     const analyses = await Promise.all(
       sessions.map(async (session) => {
-        const rawData = await db
+        // Get sensor type
+        const [sensorInfo] = await db
           .select({
-            value: sensorData.value,
-            timestamp: sensorData.timestamp,
+            type: sensors.type,
           })
+          .from(sensors)
+          .where(eq(sensors.id, session.sensorId));
+
+        // Get sensor data based on type
+        const rawData = await db
+          .select()
           .from(sensorData)
           .where(eq(sensorData.sessionId, session.id));
 
-        const data = rawData.map(item => ({
-          value: item.value,
-          timestamp: item.timestamp.toISOString(),
-        }));
+        const data = rawData.map(item => {
+          const baseData = {
+            sampleIndex: item.sampleIndex,
+            timestamp: item.timestamp.toISOString(),
+          };
+
+          switch (sensorInfo.type) {
+            case 'LD':
+              return {
+                ...baseData,
+                value: item.voltage,
+                unit: 'V',
+              };
+            case 'ACCELEROMETER':
+              return {
+                ...baseData,
+                x: item.accelerationX,
+                y: item.accelerationY,
+                z: item.accelerationZ,
+                unit: 'm/s²',
+              };
+            case 'RADAR':
+              return {
+                ...baseData,
+                value: item.distance,
+                unit: 'm',
+              };
+            default:
+              return baseData;
+          }
+        });
 
         return {
           session: {
@@ -44,6 +84,8 @@ async function getRecentAnalyses(locationId: number) {
             startTime: session.startTime.toISOString(),
             endTime: session.endTime?.toISOString() || null,
             status: session.status,
+            sensorType: sensorInfo.type,
+            metadata: session.metadata,
           },
           data,
         };
@@ -101,9 +143,9 @@ export default async function LocationPage({
       </div>
 
       <div className="mt-8">
-        <h2 className="text-2xl font-semibold mb-4">Recent Analyses</h2>
+        <h2 className="text-2xl font-semibold mb-4">Analysis History</h2>
         <AnalysisHistory analyses={recentAnalyses} />
       </div>
     </div>
   );
-} 
+}

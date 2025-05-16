@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Sensor } from '@/lib/locations'
 
@@ -9,17 +9,81 @@ interface DataAcquisitionProps {
   locationId: number
 }
 
+interface SensorData {
+  LD: { voltage: number }[]
+  ACCELEROMETER: { x: number; y: number; z: number }[]
+  RADAR: { distance: number }[]
+}
+
 export default function DataAcquisition({ sensors, locationId }: DataAcquisitionProps) {
   const router = useRouter()
   const [selectedSensor, setSelectedSensor] = useState<number | null>(null)
+  const [sensorType, setSensorType] = useState<string>('')
   const [numDataPoints, setNumDataPoints] = useState<number>(100)
   const [fileName, setFileName] = useState<string>('')
   const [isAcquiring, setIsAcquiring] = useState(false)
+  const [sensorData, setSensorData] = useState<any[]>([])
+  const [acquisitionInterval, setAcquisitionInterval] = useState<NodeJS.Timeout | null>(null)
+
+  // Update sensor type when sensor selection changes
+  useEffect(() => {
+    if (selectedSensor) {
+      const sensor = sensors.find(s => s.id === selectedSensor)
+      setSensorType(sensor?.type || '')
+    } else {
+      setSensorType('')
+    }
+  }, [selectedSensor, sensors])
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (acquisitionInterval) {
+        clearInterval(acquisitionInterval)
+      }
+    }
+  }, [acquisitionInterval])
+
+  const simulateSensorReading = (type: string): any => {
+    switch (type) {
+      case 'LD':
+        return Math.random() * 5 // 0-5V
+      case 'ACCELEROMETER':
+        return {
+          x: (Math.random() - 0.5) * 4, // ±2g
+          y: (Math.random() - 0.5) * 4,
+          z: (Math.random() - 0.5) * 4,
+        }
+      case 'RADAR':
+        return Math.random() * 10 // 0-10m
+      default:
+        return 0
+    }
+  }
 
   const handleStartAcquisition = async () => {
-    if (!selectedSensor) return
+    if (!selectedSensor || !sensorType) return
 
     setIsAcquiring(true)
+    setSensorData([])
+
+    // Simulate data collection
+    const interval = setInterval(() => {
+      setSensorData(prev => {
+        if (prev.length >= numDataPoints) {
+          clearInterval(interval)
+          setIsAcquiring(false)
+          handleDataUpload(prev)
+          return prev
+        }
+        return [...prev, simulateSensorReading(sensorType)]
+      })
+    }, 100) // Collect data every 100ms
+
+    setAcquisitionInterval(interval)
+  }
+
+  const handleDataUpload = async (data: any[]) => {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
       const sensor = sensors.find(s => s.id === selectedSensor)
@@ -33,20 +97,18 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
         body: JSON.stringify({
           locationId,
           sensorId: selectedSensor,
-          numDataPoints,
+          data,
           fileName: fileName || defaultFileName,
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to start data acquisition')
+        throw new Error('Failed to upload data')
       }
 
       router.refresh()
     } catch (error) {
-      console.error('Error starting data acquisition:', error)
-    } finally {
-      setIsAcquiring(false)
+      console.error('Error uploading data:', error)
     }
   }
 
@@ -101,28 +163,46 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
             value={fileName}
             onChange={(e) => setFileName(e.target.value)}
             disabled={isAcquiring}
-            placeholder="Leave empty for auto-generated name"
             className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="Enter file name"
           />
-          <p className="mt-1 text-sm text-gray-500">
-            If not specified, will use timestamp and sensor name
-          </p>
         </div>
 
         <div>
           <button
             onClick={handleStartAcquisition}
             disabled={!selectedSensor || isAcquiring}
-            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white 
-              ${!selectedSensor || isAcquiring
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-              }`}
+            className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${isAcquiring ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'}`}
           >
             {isAcquiring ? 'Acquiring Data...' : 'Start Acquisition'}
           </button>
         </div>
+
+        {isAcquiring && (
+          <div className="mt-4">
+            <div className="relative pt-1">
+              <div className="flex mb-2 items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-indigo-600 bg-indigo-200">
+                    Progress
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-semibold inline-block text-indigo-600">
+                    {Math.round((sensorData.length / numDataPoints) * 100)}%
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-indigo-200">
+                <div
+                  style={{ width: `${(sensorData.length / numDataPoints) * 100}%` }}
+                  className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
-} 
+}
