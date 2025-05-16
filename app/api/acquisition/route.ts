@@ -50,7 +50,8 @@ export async function POST(request: Request) {
         metadata: {}, // Additional metadata if needed
       };
 
-      switch (sensor.type) {
+      const sensorType = sensor.type.toUpperCase();
+      switch (sensorType) {
         case 'LD':
           return {
             ...baseReading,

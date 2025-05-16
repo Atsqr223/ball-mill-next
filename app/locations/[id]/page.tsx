@@ -26,7 +26,7 @@ async function getRecentAnalyses(locationId: number) {
       })
       .from(acquisitionSessions)
       .where(eq(acquisitionSessions.locationId, locationId))
-      .orderBy(acquisitionSessions.createdAt)
+      .orderBy(acquisitionSessions.createdAt, { order: 'desc' })
       .limit(50);
 
     const analyses = await Promise.all(
