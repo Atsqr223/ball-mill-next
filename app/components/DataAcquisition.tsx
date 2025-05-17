@@ -21,6 +21,7 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
   const [selectedSensor, setSelectedSensor] = useState<number | null>(null)
   const [sensorType, setSensorType] = useState<string>('')
   const [numDataPoints, setNumDataPoints] = useState<number>(100)
+  const [fileName, setFileName] = useState<string>('')
   const [isAcquiring, setIsAcquiring] = useState(false)
   const [sensorData, setSensorData] = useState<SensorDataPoint[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +44,27 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
     setError(null);
 
     try {
-      const response = await fetch('/api/acquisition', {
+      // First, create an acquisition session
+      const sessionResponse = await fetch('/api/acquisition/session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          locationId,
+          sensorId: selectedSensor,
+          fileName: fileName || `acquisition_${new Date().toISOString()}`,
+        }),
+      });
+
+      const sessionResult = await sessionResponse.json();
+      
+      if (!sessionResponse.ok) {
+        throw new Error(sessionResult.error || 'Failed to create acquisition session');
+      }
+
+      // Then acquire the data
+      const dataResponse = await fetch('/api/acquisition', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -52,12 +73,13 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
           locationId,
           sensorId: selectedSensor,
           numDataPoints,
+          sessionId: sessionResult.sessionId,
         }),
       });
 
-      const result = await response.json();
+      const result = await dataResponse.json();
       
-      if (!response.ok) {
+      if (!dataResponse.ok) {
         throw new Error(result.error || 'Failed to acquire data');
       }
 
@@ -97,6 +119,21 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="fileName" className="block text-sm font-medium text-gray-700 mb-2">
+            File Name (Optional)
+          </label>
+          <input
+            type="text"
+            id="fileName"
+            value={fileName}
+            onChange={(e) => setFileName(e.target.value)}
+            placeholder="Enter a name for this acquisition"
+            disabled={isAcquiring}
+            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          />
         </div>
 
         <div>
