@@ -44,6 +44,7 @@ interface Analysis {
     status: string;
     sensorType: string;
     metadata: Record<string, any>;
+    fileName: string | null;
   };
   data: SensorReading[];
 }
@@ -140,7 +141,7 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
             <div className="flex justify-between items-start mb-2">
               <div>
                 <h3 className="font-medium">
-                  Session #{analysis.session.id}
+                  {analysis.session.fileName || `Session #${analysis.session.id}`}
                 </h3>
                 <p className="text-sm text-gray-500">
                   {new Date(analysis.session.startTime).toLocaleString()}

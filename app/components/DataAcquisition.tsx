@@ -62,7 +62,7 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
   }
 
   const handleStartAcquisition = async () => {
-    if (!selectedSensor || !sensorType) return
+    if (!selectedSensor || !sensorType || isAcquiring) return
 
     setIsAcquiring(true)
     setSensorData([])
@@ -106,6 +106,9 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
         throw new Error('Failed to upload data')
       }
 
+      // Clear the file name after successful upload
+      setFileName('')
+      // Force an immediate refresh
       router.refresh()
     } catch (error) {
       console.error('Error uploading data:', error)

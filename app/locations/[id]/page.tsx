@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { locations } from '@/lib/locations';
 import { db } from '@/lib/db';
 import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import LiveStream from '@/app/components/LiveStream';
 import DataAcquisition from '@/app/components/DataAcquisition';
 import AnalysisHistory from '@/app/components/AnalysisHistory';
@@ -23,11 +23,11 @@ async function getRecentAnalyses(locationId: number) {
         status: acquisitionSessions.status,
         metadata: acquisitionSessions.metadata,
         sensorId: acquisitionSessions.sensorId,
+        fileName: acquisitionSessions.fileName,
       })
       .from(acquisitionSessions)
       .where(eq(acquisitionSessions.locationId, locationId))
-      .orderBy(acquisitionSessions.createdAt, { order: 'desc' })
-      .limit(50);
+      .orderBy(desc(acquisitionSessions.startTime)); //Ensures newest first
 
     const analyses = await Promise.all(
       sessions.map(async (session) => {
