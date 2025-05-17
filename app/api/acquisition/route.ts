@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
-import { eq } from 'drizzle-orm';
+import { sensorData, sensors } from '@/lib/schema';
+import { eq, desc } from 'drizzle-orm';
 
 export async function POST(request: Request) {
   try {
-    const { locationId, sensorId, data, fileName } = await request.json();
+    const { locationId, sensorId, numDataPoints } = await request.json();
 
-    if (!locationId || !sensorId || !data || !Array.isArray(data)) {
+    if (!locationId || !sensorId || !numDataPoints) {
       return NextResponse.json(
         { error: 'Missing required fields or invalid data format' },
         { status: 400 }
@@ -27,67 +27,26 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create acquisition session
-    const [session] = await db
-      .insert(acquisitionSessions)
-      .values({
-        locationId,
-        sensorId,
-        status: 'in_progress',
-        startTime: new Date(),
-        fileName: fileName || null,
-        metadata: { sensorType: sensor.type },
-      })
-      .returning();
+    // Get the most recent sensor data points
+    const data = await db
+      .select()
+      .from(sensorData)
+      .where(eq(sensorData.sensorId, sensorId))
+      .orderBy(desc(sensorData.timestamp))
+      .limit(numDataPoints);
 
-    // Process and insert sensor data based on sensor type
-    const sensorReadings = data.map((reading: any, index: number) => {
-      const baseReading = {
-        sessionId: session.id,
-        sensorId,
-        sampleIndex: index,
-        timestamp: new Date(Date.now() + index * 1000), // Simulate 1-second intervals
-        metadata: {}, // Additional metadata if needed
-      };
+    if (!data || data.length === 0) {
+      return NextResponse.json(
+        { error: 'No data found for this sensor' },
+        { status: 404 }
+      );
+    }
 
-      const sensorType = sensor.type.toUpperCase();
-      switch (sensorType) {
-        case 'LD':
-          return {
-            ...baseReading,
-            voltage: parseFloat(reading),
-          };
-        case 'ACCELEROMETER':
-          const [x, y, z] = reading.split(',').map(Number);
-          return {
-            ...baseReading,
-            accelerationX: x,
-            accelerationY: y,
-            accelerationZ: z,
-          };
-        case 'RADAR':
-          return {
-            ...baseReading,
-            distance: parseFloat(reading),
-          };
-        default:
-          throw new Error(`Unsupported sensor type: ${sensor.type}`);
-      }
+    return NextResponse.json({
+      success: true,
+      data: data,
+      message: `Successfully retrieved ${data.length} data points`
     });
-
-    // Insert sensor data
-    await db.insert(sensorData).values(sensorReadings);
-
-    // Update session status
-    await db
-      .update(acquisitionSessions)
-      .set({
-        status: 'completed',
-        endTime: new Date(),
-      })
-      .where(eq(acquisitionSessions.id, session.id));
-
-    return NextResponse.json({ success: true, sessionId: session.id });
   } catch (error) {
     console.error('Error in data acquisition:', error);
     return NextResponse.json(

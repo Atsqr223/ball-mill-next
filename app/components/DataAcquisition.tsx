@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import type { Sensor } from '@/lib/locations'
 
 interface DataAcquisitionProps {
@@ -9,86 +8,41 @@ interface DataAcquisitionProps {
   locationId: number
 }
 
-interface SensorData {
-  LD: { voltage: number }[]
-  ACCELEROMETER: { x: number; y: number; z: number }[]
-  RADAR: { distance: number }[]
+interface SensorDataPoint {
+  timestamp: string;
+  value?: number;
+  x?: number;
+  y?: number;
+  z?: number;
+  unit?: string;
 }
 
 export default function DataAcquisition({ sensors, locationId }: DataAcquisitionProps) {
-  const router = useRouter()
   const [selectedSensor, setSelectedSensor] = useState<number | null>(null)
   const [sensorType, setSensorType] = useState<string>('')
   const [numDataPoints, setNumDataPoints] = useState<number>(100)
-  const [fileName, setFileName] = useState<string>('')
   const [isAcquiring, setIsAcquiring] = useState(false)
-  const [sensorData, setSensorData] = useState<any[]>([])
-  const [acquisitionInterval, setAcquisitionInterval] = useState<NodeJS.Timeout | null>(null)
+  const [sensorData, setSensorData] = useState<SensorDataPoint[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   // Update sensor type when sensor selection changes
-  useEffect(() => {
-    if (selectedSensor) {
-      const sensor = sensors.find(s => s.id === selectedSensor)
-      setSensorType(sensor?.type || '')
-    } else {
-      setSensorType('')
-    }
-  }, [selectedSensor, sensors])
-
-  // Cleanup interval on unmount
-  useEffect(() => {
-    return () => {
-      if (acquisitionInterval) {
-        clearInterval(acquisitionInterval)
-      }
-    }
-  }, [acquisitionInterval])
-
-  const simulateSensorReading = (type: string): any => {
-    switch (type) {
-      case 'LD':
-        return Math.random() * 5 // 0-5V
-      case 'ACCELEROMETER':
-        return {
-          x: (Math.random() - 0.5) * 4, // ±2g
-          y: (Math.random() - 0.5) * 4,
-          z: (Math.random() - 0.5) * 4,
-        }
-      case 'RADAR':
-        return Math.random() * 10 // 0-10m
-      default:
-        return 0
-    }
-  }
+  const handleSensorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const sensorId = Number(e.target.value);
+    setSelectedSensor(sensorId);
+    const sensor = sensors.find(s => s.id === sensorId);
+    setSensorType(sensor?.type || '');
+    setSensorData([]);
+    setError(null);
+  };
 
   const handleStartAcquisition = async () => {
-    if (!selectedSensor || !sensorType || isAcquiring) return
+    if (!selectedSensor || !sensorType || isAcquiring) return;
 
-    setIsAcquiring(true)
-    setSensorData([])
+    setIsAcquiring(true);
+    setSensorData([]);
+    setError(null);
 
-    // Simulate data collection
-    const interval = setInterval(() => {
-      setSensorData(prev => {
-        if (prev.length >= numDataPoints) {
-          clearInterval(interval)
-          setIsAcquiring(false)
-          handleDataUpload(prev)
-          return prev
-        }
-        return [...prev, simulateSensorReading(sensorType)]
-      })
-    }, 100) // Collect data every 100ms
-
-    setAcquisitionInterval(interval)
-  }
-
-  const handleDataUpload = async (data: any[]) => {
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-      const sensor = sensors.find(s => s.id === selectedSensor)
-      const defaultFileName = `${timestamp}_${sensor?.name || 'sensor'}`
-      
       const response = await fetch('/api/acquisition', {
         method: 'POST',
         headers: {
@@ -97,23 +51,28 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
         body: JSON.stringify({
           locationId,
           sensorId: selectedSensor,
-          data,
-          fileName: fileName || defaultFileName,
+          numDataPoints,
         }),
-      })
+      });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        throw new Error('Failed to upload data')
+        throw new Error(result.error || 'Failed to acquire data');
       }
 
-      // Clear the file name after successful upload
-      setFileName('')
-      // Force an immediate refresh
-      router.refresh()
+      if (result.success) {
+        setSensorData(result.data);
+      } else {
+        throw new Error(result.error || 'Failed to acquire data');
+      }
     } catch (error) {
-      console.error('Error uploading data:', error)
+      console.error('Error during data acquisition:', error);
+      setError(error instanceof Error ? error.message : 'Failed to acquire data');
+    } finally {
+      setIsAcquiring(false);
     }
-  }
+  };
 
   return (
     <div className="bg-white shadow rounded-lg p-6">
@@ -127,7 +86,7 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
           <select
             id="sensor"
             value={selectedSensor || ''}
-            onChange={(e) => setSelectedSensor(Number(e.target.value))}
+            onChange={handleSensorChange}
             disabled={isAcquiring}
             className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
           >
@@ -157,21 +116,6 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
         </div>
 
         <div>
-          <label htmlFor="fileName" className="block text-sm font-medium text-gray-700 mb-2">
-            File Name (Optional)
-          </label>
-          <input
-            type="text"
-            id="fileName"
-            value={fileName}
-            onChange={(e) => setFileName(e.target.value)}
-            disabled={isAcquiring}
-            className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            placeholder="Enter file name"
-          />
-        </div>
-
-        <div>
           <button
             onClick={handleStartAcquisition}
             disabled={!selectedSensor || isAcquiring}
@@ -180,6 +124,12 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
             {isAcquiring ? 'Acquiring Data...' : 'Start Acquisition'}
           </button>
         </div>
+
+        {error && (
+          <div className="text-red-600 text-sm mt-2">
+            {error}
+          </div>
+        )}
 
         {isAcquiring && (
           <div className="mt-4">
@@ -202,6 +152,17 @@ export default function DataAcquisition({ sensors, locationId }: DataAcquisition
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-indigo-500"
                 />
               </div>
+            </div>
+          </div>
+        )}
+
+        {sensorData.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Acquired Data</h3>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <pre className="text-sm text-gray-700 overflow-auto max-h-60">
+                {JSON.stringify(sensorData, null, 2)}
+              </pre>
             </div>
           </div>
         )}

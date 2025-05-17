@@ -1,3 +1,25 @@
+# eventual sensor ids:
+#tcs:
+# 1 - Radar
+# 2 - Accelerometer
+# 3 - LD
+# 4 - Microphone
+#iitkgp
+# 5 - Radar
+# 6 - Accelerometer
+# 7 - LD
+# 8 - Microphone
+#tata_steel
+# 9 - Radar
+# 10 - Accelerometer
+# 11 - LD
+# 12 - Microphone
+
+# location ids:
+# 1 - TCSRI
+# 2 - IITKGP
+# 3 - Tata Steel
+
 import os
 import csv
 import psycopg2

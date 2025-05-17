@@ -21,9 +21,9 @@ export const locations: Location[] = [
     status: 'active',
     sensors: [
       { id: 1, type: 'Radar', name: 'Radar Sensor 1', status: 'active' },
-      { id: 2, type: 'Mic', name: 'Microphone 1', status: 'active' },
-      { id: 3, type: 'Acceleration', name: 'Accelerometer 1', status: 'active' },
-      { id: 4, type: 'LD', name: 'LD Sensor 1', status: 'active' },
+      { id: 2, type: 'Acceleration', name: 'Accelerometer 1', status: 'active' },
+      { id: 3, type: 'LD', name: 'LD Sensor 1', status: 'active' },
+      { id: 4, type: 'Mic', name: 'Microphone 1', status: 'active' },
     ],
   },
   {
@@ -33,9 +33,9 @@ export const locations: Location[] = [
     status: 'active',
     sensors: [
       { id: 5, type: 'Radar', name: 'Radar Sensor 2', status: 'active' },
-      { id: 6, type: 'Mic', name: 'Microphone 2', status: 'active' },
-      { id: 7, type: 'Acceleration', name: 'Accelerometer 2', status: 'active' },
-      { id: 8, type: 'LD', name: 'LD Sensor 2', status: 'active' },
+      { id: 6, type: 'Acceleration', name: 'Accelerometer 2', status: 'active' },
+      { id: 7, type: 'LD', name: 'LD Sensor 2', status: 'active' },
+      { id: 8, type: 'Mic', name: 'Microphone 2', status: 'active' },
     ],
   },
   {
@@ -45,9 +45,9 @@ export const locations: Location[] = [
     status: 'active',
     sensors: [
       { id: 9, type: 'Radar', name: 'Radar Sensor 3', status: 'active' },
-      { id: 10, type: 'Mic', name: 'Microphone 3', status: 'active' },
-      { id: 11, type: 'Acceleration', name: 'Accelerometer 3', status: 'active' },
-      { id: 12, type: 'LD', name: 'LD Sensor 3', status: 'active' },
+      { id: 10, type: 'Acceleration', name: 'Accelerometer 3', status: 'active' },
+      { id: 11, type: 'LD', name: 'LD Sensor 3', status: 'active' },
+      { id: 12, type: 'Mic', name: 'Microphone 3', status: 'active' },
     ],
   },
 ]; 
