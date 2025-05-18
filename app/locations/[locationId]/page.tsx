@@ -7,8 +7,8 @@ import LiveStream from '@/app/components/LiveStream';
 import DataAcquisition from '@/app/components/DataAcquisition';
 import AnalysisHistory from '@/app/components/AnalysisHistory';
 
-async function getLocation(id: number) {
-  const location = locations.find(loc => loc.id === id);
+async function getLocation(locationId: number) {
+  const location = locations.find(loc => loc.id === locationId);
   if (!location) return null;
   return location;
 }
@@ -21,17 +21,16 @@ async function getRecentAnalyses(locationId: number) {
         startTime: acquisitionSessions.startTime,
         endTime: acquisitionSessions.endTime,
         status: acquisitionSessions.status,
-        metadata: acquisitionSessions.metadata,
+        metadata: acquisitionSessions.metadata as Record<string, any>,
         sensorId: acquisitionSessions.sensorId,
         fileName: acquisitionSessions.fileName,
       })
       .from(acquisitionSessions)
       .where(eq(acquisitionSessions.locationId, locationId))
-      .orderBy(desc(acquisitionSessions.startTime)); //Ensures newest first
+      .orderBy(desc(acquisitionSessions.startTime));
 
     const analyses = await Promise.all(
       sessions.map(async (session) => {
-        // Get sensor type
         const [sensorInfo] = await db
           .select({
             type: sensors.type,
@@ -39,15 +38,14 @@ async function getRecentAnalyses(locationId: number) {
           .from(sensors)
           .where(eq(sensors.id, session.sensorId));
 
-        // Get sensor data based on type
         const rawData = await db
           .select()
           .from(sensorData)
-          .where(eq(sensorData.sessionId, session.id));
+          .where(eq(sensorData.acquisitionSessionId, session.id));
 
         const data = rawData.map(item => {
           const baseData = {
-            sampleIndex: item.sampleIndex,
+            id: item.id,
             timestamp: item.timestamp.toISOString(),
           };
 
@@ -55,21 +53,21 @@ async function getRecentAnalyses(locationId: number) {
             case 'LD':
               return {
                 ...baseData,
-                value: item.voltage,
+                voltage: item.voltage || undefined,
                 unit: 'V',
               };
             case 'ACCELEROMETER':
               return {
                 ...baseData,
-                x: item.accelerationX,
-                y: item.accelerationY,
-                z: item.accelerationZ,
+                x: item.accelerationX || undefined,
+                y: item.accelerationY || undefined,
+                z: item.accelerationZ || undefined,
                 unit: 'm/s²',
               };
             case 'RADAR':
               return {
                 ...baseData,
-                value: item.distance,
+                distance: item.distance || undefined,
                 unit: 'm',
               };
             default:
@@ -80,6 +78,7 @@ async function getRecentAnalyses(locationId: number) {
         return {
           session: {
             id: session.id,
+            fileName: session.fileName,
             numDataPoints: data.length,
             startTime: session.startTime.toISOString(),
             endTime: session.endTime?.toISOString() || null,
@@ -102,9 +101,9 @@ async function getRecentAnalyses(locationId: number) {
 export default async function LocationPage({
   params,
 }: {
-  params: { id: string };
+  params: { locationId: string };
 }) {
-  const locationId = parseInt(params.id);
+  const locationId = parseInt(params.locationId);
   const location = await getLocation(locationId);
 
   if (!location) {
@@ -144,8 +143,8 @@ export default async function LocationPage({
 
       <div className="mt-8">
         <h2 className="text-2xl font-semibold mb-4">Analysis History</h2>
-        <AnalysisHistory analyses={recentAnalyses} />
+        <AnalysisHistory analyses={recentAnalyses} locationId={locationId} />
       </div>
     </div>
   );
-}
+} 

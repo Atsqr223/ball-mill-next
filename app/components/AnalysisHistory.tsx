@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Line } from 'react-chartjs-2';
+import Link from 'next/link';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,7 +25,7 @@ ChartJS.register(
 );
 
 interface SensorReading {
-  sampleIndex: number;
+  id: number;
   timestamp: string;
   value?: number;
   voltage?: number;
@@ -51,9 +52,10 @@ interface Analysis {
 
 interface AnalysisHistoryProps {
   analyses: Analysis[];
+  locationId: number;
 }
 
-export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
+export default function AnalysisHistory({ analyses, locationId }: AnalysisHistoryProps) {
   const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
 
   if (analyses.length === 0) {
@@ -129,52 +131,50 @@ export default function AnalysisHistory({ analyses }: AnalysisHistoryProps) {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {analyses.map((analysis) => (
-          <button
+          <Link
             key={analysis.session.id}
-            onClick={() => setSelectedAnalysis(analysis)}
-            className={`p-4 rounded-lg text-left transition-colors ${
-              selectedAnalysis?.session.id === analysis.session.id
-                ? 'bg-blue-50 border-2 border-blue-500'
-                : 'bg-white border border-gray-200 hover:border-blue-300'
-            }`}
+            href={`/locations/${locationId}/acquisitions/${analysis.session.id}`}
+            className="block"
           >
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="font-medium">
-                  {analysis.session.fileName || `Session #${analysis.session.id}`}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {new Date(analysis.session.startTime).toLocaleString()}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Sensor Type: {analysis.session.sensorType}
-                </p>
+            <div className="p-4 rounded-lg bg-white border border-gray-200 hover:border-blue-300 transition-colors">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <h3 className="font-medium">
+                    {analysis.session.fileName || `Session #${analysis.session.id}`}
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    {new Date(analysis.session.startTime).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Sensor Type: {analysis.session.sensorType}
+                  </p>
+                </div>
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    analysis.session.status === 'completed'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}
+                >
+                  {analysis.session.status}
+                </span>
               </div>
-              <span
-                className={`px-2 py-1 text-xs rounded-full ${
-                  analysis.session.status === 'completed'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}
-              >
-                {analysis.session.status}
-              </span>
+              <div className="text-sm text-gray-500">
+                <p>{analysis.session.numDataPoints} data points</p>
+                {analysis.session.endTime && (
+                  <p>
+                    Duration:{' '}
+                    {Math.round(
+                      (new Date(analysis.session.endTime).getTime() -
+                        new Date(analysis.session.startTime).getTime()) /
+                        1000
+                    )}{' '}
+                    seconds
+                  </p>
+                )}
+              </div>
             </div>
-            <div className="text-sm text-gray-500">
-              <p>{analysis.session.numDataPoints} data points</p>
-              {analysis.session.endTime && (
-                <p>
-                  Duration:{' '}
-                  {Math.round(
-                    (new Date(analysis.session.endTime).getTime() -
-                      new Date(analysis.session.startTime).getTime()) /
-                      1000
-                  )}{' '}
-                  seconds
-                </p>
-              )}
-            </div>
-          </button>
+          </Link>
         ))}
       </div>
 
