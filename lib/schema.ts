@@ -28,15 +28,15 @@ export const sensors = pgTable('sensors', {
 export const sensorData = pgTable('sensor_data', {
   id: serial('id').primaryKey(),
   sensorId: integer('sensor_id').references(() => sensors.id).notNull(),
-  acquisitionSessionId: integer('acquisition_session_id').references(() => acquisitionSessions.id),
+  acquisitionSessionId: integer('acquisition_session_id').references(() => acquisitionSessions.id), // Optional reference to an acquisition session
   // LD Sensor data
-  voltage: real('voltage'),
+  distance: real('distance'),
   // Accelerometer data
   accelerationX: real('acceleration_x'),
   accelerationY: real('acceleration_y'),
   accelerationZ: real('acceleration_z'),
   // Radar data
-  distance: real('distance'),
+  radar: real('radar'),
   timestamp: timestamp('timestamp').notNull(),
   metadata: jsonb('metadata'), // Additional measurement metadata
   createdAt: timestamp('created_at').defaultNow(),

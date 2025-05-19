@@ -1,5 +1,5 @@
 # eventual sensor ids:
-#tcs:
+# tcsri
 # 1 - Radar
 # 2 - Accelerometer
 # 3 - LD
@@ -20,11 +20,20 @@
 # 2 - IITKGP
 # 3 - Tata Steel
 
+# sensor types:
+# RADAR
+# ACCELEROMETER
+# LD
+# MICROPHONE
+
+# operating command:
+# python scripts/upload_sensor_data.py <file_path> <location_id> <sensor_id> <sensor_type>
+
 import os
 import csv
 import psycopg2
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -41,36 +50,46 @@ def process_sensor_data(file_path, sensor_type):
         # Skip header row
         next(reader)
         
-        for i, row in enumerate(reader):
+        for row in reader:
             try:
-                timestamp = datetime.now().isoformat()
                 if sensor_type == 'LD':
-                    # LD sensor data has one voltage value per row
+                    # LD sensor data has voltage (to be stored as distance) and sample_index
+                    sample_index = int(row[1])
+                    # Assuming 1000 Hz sampling rate for LD sensor
+                    time_from_start = sample_index / 1000.0
                     data.append({
-                        'sample_index': i,
-                        'voltage': float(row[0]),
-                        'timestamp': timestamp,
+                        'distance': float(row[0]),  # Store voltage as distance
+                        'timestamp': None,
+                        'metadata': json.dumps({
+                            'sample_index': sample_index,
+                            'time_from_start': time_from_start,
+                            'unit': 'seconds'
+                        })
                     })
                 elif sensor_type == 'ACCELEROMETER':
-                    # Accelerometer data has x, y, z values
-                    if len(row) >= 3:
-                        x, y, z = map(float, row[:3])
-                        data.append({
-                            'sample_index': i,
-                            'acceleration_x': x,
-                            'acceleration_y': y,
-                            'acceleration_z': z,
-                            'timestamp': timestamp,
-                        })
-                elif sensor_type == 'RADAR':
-                    # Radar data has distance value
+                    # Accelerometer data has time, x, y, z values
                     data.append({
-                        'sample_index': i,
-                        'distance': float(row[0]),
-                        'timestamp': timestamp,
+                        'acceleration_x': float(row[1]),
+                        'acceleration_y': float(row[2]),
+                        'acceleration_z': float(row[3]),
+                        'timestamp': None,  # We'll use the actual time value
+                        'metadata': json.dumps({
+                            'time_from_start': float(row[0]),  # Store original time value
+                            'unit': 'seconds'
+                        })
+                    })
+                elif sensor_type == 'RADAR':
+                    # Radar data has time and voltage (to be stored as radar)
+                    data.append({
+                        'radar': float(row[1]),  # Store voltage in radar field
+                        'timestamp': None,  # We'll use the actual time value
+                        'metadata': json.dumps({
+                            'time_from_start': float(row[0]),  # Store original time value
+                            'unit': 'seconds'
+                        })
                     })
             except (ValueError, IndexError) as e:
-                print(f"Warning: Skipping row {i+1} due to error: {str(e)}")
+                print(f"Warning: Skipping row due to error: {str(e)}")
                 continue
                 
     if not data:
@@ -78,7 +97,7 @@ def process_sensor_data(file_path, sensor_type):
         
     return data
 
-def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type):
+def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type, session_id=None):
     conn = None
     cursor = None
     try:
@@ -91,47 +110,50 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type):
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        # Create an acquisition session
-        cursor.execute(
-            """
-            INSERT INTO acquisition_sessions 
-            (location_id, sensor_id, status, start_time, file_name, metadata)
-            VALUES (%s, %s, %s, NOW(), %s, %s)
-            RETURNING id
-            """,
-            (location_id, sensor_id, 'completed', os.path.basename(file_path), 
-             json.dumps({'sensor_type': sensor_type}))
-        )
-        session_id = cursor.fetchone()[0]
+        # Get start time for the data points
+        start_time = datetime.now()
         
         # Insert sensor data
         for reading in sensor_data:
+            # Calculate actual timestamp using time from start
+            time_from_start = json.loads(reading['metadata'])['time_from_start']
+            actual_timestamp = start_time + timedelta(seconds=time_from_start)
+            
             # Base values that are common for all sensor types
             values = [
-                session_id,  # session_id
                 sensor_id,   # sensor_id
-                reading['sample_index'],  # sample_index
-                reading['timestamp'],     # timestamp
-                json.dumps({}),          # metadata (empty for now)
+                actual_timestamp,     # timestamp
+                reading['metadata'],      # metadata
             ]
             
+            # Add session_id if provided
+            if session_id is not None:
+                values.insert(0, session_id)  # acquisition_session_id
+            
             # Add sensor-specific values
+            # Construct the SQL query based on sensor type and session presence
             if sensor_type == 'LD':
+                fields = ['sensor_id', 'timestamp', 'metadata', 'distance']
+                if session_id is not None:
+                    fields.insert(0, 'acquisition_session_id')
                 cursor.execute(
-                    """
+                    f"""
                     INSERT INTO sensor_data 
-                    (session_id, sensor_id, sample_index, timestamp, metadata, voltage)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ({', '.join(fields)})
+                    VALUES ({', '.join(['%s'] * len(fields))})
                     """,
-                    values + [reading['voltage']]
+                    values + [reading['distance']]
                 )
             elif sensor_type == 'ACCELEROMETER':
+                fields = ['sensor_id', 'timestamp', 'metadata', 
+                         'acceleration_x', 'acceleration_y', 'acceleration_z']
+                if session_id is not None:
+                    fields.insert(0, 'acquisition_session_id')
                 cursor.execute(
-                    """
+                    f"""
                     INSERT INTO sensor_data 
-                    (session_id, sensor_id, sample_index, timestamp, metadata, 
-                     acceleration_x, acceleration_y, acceleration_z)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ({', '.join(fields)})
+                    VALUES ({', '.join(['%s'] * len(fields))})
                     """,
                     values + [
                         reading['acceleration_x'],
@@ -140,24 +162,28 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type):
                     ]
                 )
             elif sensor_type == 'RADAR':
+                fields = ['sensor_id', 'timestamp', 'metadata', 'radar']
+                if session_id is not None:
+                    fields.insert(0, 'acquisition_session_id')
+                cursor.execute(
+                    f"""
+                    INSERT INTO sensor_data 
+                    ({', '.join(fields)})
+                    VALUES ({', '.join(['%s'] * len(fields))})
+                    """,
+                    values + [reading['radar']]
+                )
+            
+            # Update session end time if we're using a session
+            if session_id is not None:
                 cursor.execute(
                     """
-                    INSERT INTO sensor_data 
-                    (session_id, sensor_id, sample_index, timestamp, metadata, distance)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    UPDATE acquisition_sessions 
+                    SET end_time = NOW()
+                    WHERE id = %s
                     """,
-                    values + [reading['distance']]
+                    (session_id,)
                 )
-        
-        # Update session end time
-        cursor.execute(
-            """
-            UPDATE acquisition_sessions 
-            SET end_time = NOW()
-            WHERE id = %s
-            """,
-            (session_id,)
-        )
         
         # Commit the transaction
         conn.commit()
@@ -183,6 +209,7 @@ if __name__ == '__main__':
     parser.add_argument('sensor_id', type=int, help='Sensor ID')
     parser.add_argument('sensor_type', choices=['LD', 'ACCELEROMETER', 'RADAR'],
                         help='Type of sensor')
+    parser.add_argument('--session_id', type=int, help='Existing session ID to append data to')
     
     args = parser.parse_args()
     
@@ -192,7 +219,8 @@ if __name__ == '__main__':
             args.file_path,
             args.location_id,
             args.sensor_id,
-            args.sensor_type
+            args.sensor_type,
+            args.session_id
         )
         print("Data upload completed successfully")
     except Exception as e:
