@@ -51,37 +51,16 @@ export async function GET(
     }
 
     // Format the data based on sensor type
-    const formattedData = data.map(point => {
-      const baseData = {
-        id: point.id,
-        timestamp: point.timestamp,
-      };
-
-      switch (sensor.type) {
-        case 'LD':
-          return {
-            ...baseData,
-            value: point.voltage,
-            unit: 'V'
-          };
-        case 'ACCELEROMETER':
-          return {
-            ...baseData,
-            x: point.accelerationX,
-            y: point.accelerationY,
-            z: point.accelerationZ,
-            unit: 'm/s²'
-          };
-        case 'RADAR':
-          return {
-            ...baseData,
-            value: point.distance,
-            unit: 'm'
-          };
-        default:
-          return baseData;
-      }
-    });
+    const formattedData = data.map(point => ({
+      id: point.id,
+      timestamp: point.timestamp.toISOString(),
+      value: point.radar,
+      x: point.accelerationX,
+      y: point.accelerationY,
+      z: point.accelerationZ,
+      distance: point.distance,
+      metadata: point.metadata
+    }));
 
     return NextResponse.json({
       success: true,

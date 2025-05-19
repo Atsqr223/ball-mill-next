@@ -34,6 +34,10 @@ interface SensorReading {
   z?: number;
   distance?: number;
   unit?: string;
+  radar?: number;
+  acceleration_x?: number;
+  acceleration_y?: number;
+  acceleration_z?: number;
 }
 
 interface Analysis {
@@ -53,6 +57,15 @@ interface Analysis {
 interface AnalysisHistoryProps {
   analyses: Analysis[];
   locationId: number;
+}
+
+interface AnalysisData {
+  timestamp: string;
+  radar?: number;
+  acceleration_x?: number;
+  acceleration_y?: number;
+  acceleration_z?: number;
+  distance?: number;
 }
 
 export default function AnalysisHistory({ analyses, locationId }: AnalysisHistoryProps) {
@@ -113,8 +126,8 @@ export default function AnalysisHistory({ analyses, locationId }: AnalysisHistor
           labels,
           datasets: [
             {
-              label: 'Distance (m)',
-              data: analysis.data.map((d) => d.distance),
+              label: 'Radar',
+              data: analysis.data.map((d) => d.radar),
               borderColor: 'rgb(75, 192, 192)',
               tension: 0.1,
             },

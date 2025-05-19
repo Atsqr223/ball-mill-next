@@ -140,10 +140,10 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
                 <tr className="border-b">
                   <th className="text-left py-2">ID</th>
                   <th className="text-left py-2">Timestamp</th>
-                  <th className="text-left py-2">X</th>
-                  <th className="text-left py-2">Y</th>
-                  <th className="text-left py-2">Z</th>
-                  <th className="text-left py-2">Voltage</th>
+                  <th className="text-left py-2">Radar</th>
+                  <th className="text-left py-2">Acceleration X</th>
+                  <th className="text-left py-2">Acceleration Y</th>
+                  <th className="text-left py-2">Acceleration Z</th>
                   <th className="text-left py-2">Distance</th>
                 </tr>
               </thead>
@@ -151,11 +151,11 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
                 {data.map((point) => (
                   <tr key={point.id} className="border-b">
                     <td className="py-2">{point.id}</td>
-                    <td className="py-2">{point.timestamp.toString()}</td>
+                    <td className="py-2">{new Date(point.timestamp).toLocaleString()}</td>
+                    <td className="py-2">{point.radar}</td>
                     <td className="py-2">{point.accelerationX}</td>
                     <td className="py-2">{point.accelerationY}</td>
                     <td className="py-2">{point.accelerationZ}</td>
-                    <td className="py-2">{point.voltage}</td>
                     <td className="py-2">{point.distance}</td>
                   </tr>
                 ))}

@@ -35,9 +35,9 @@ A modern web application for monitoring and analyzing ball mill operations acros
    ```
 
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+npm install
+```
 
 3. Create a `.env` file:
    ```bash
@@ -46,14 +46,14 @@ A modern web application for monitoring and analyzing ball mill operations acros
    Fill in the environment variables with your values.
 
 4. Push the database schema:
-   ```bash
+```bash
    npm run db:push
-   ```
+```
 
 5. Start the development server:
-   ```bash
-   npm run dev
-   ```
+```bash
+npm run dev
+```
 
 ## Project Structure
 

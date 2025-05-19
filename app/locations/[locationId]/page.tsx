@@ -98,6 +98,15 @@ async function getRecentAnalyses(locationId: number) {
   }
 }
 
+interface DataPoint {
+  timestamp: string;
+  radar?: number;
+  acceleration_x?: number;
+  acceleration_y?: number;
+  acceleration_z?: number;
+  distance?: number;
+}
+
 export default async function LocationPage({
   params,
 }: {
