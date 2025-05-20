@@ -4,6 +4,7 @@ import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import TimeSeriesPlot from '@/app/components/TimeSeriesPlot';
 
 function formatTimeAgo(date: Date) {
   const now = new Date();
@@ -87,6 +88,16 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
 
   const { session, sensorInfo, data } = result;
 
+  // Prepare data for the time series plot
+  const plotData = {
+    times: data.map(point => point.sensorTime || 0),
+    radar: data.map(point => point.radar || null),
+    accelerationX: data.map(point => point.accelerationX || null),
+    accelerationY: data.map(point => point.accelerationY || null),
+    accelerationZ: data.map(point => point.accelerationZ || null),
+    distance: data.map(point => point.distance || null),
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Card className="mb-8">
@@ -129,7 +140,7 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-8">
         <CardHeader>
           <CardTitle>Raw Data Points</CardTitle>
         </CardHeader>
@@ -139,7 +150,7 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2">ID</th>
-                  <th className="text-left py-2">Timestamp</th>
+                  <th className="text-left py-2">Sensor Time</th>
                   <th className="text-left py-2">Radar</th>
                   <th className="text-left py-2">Acceleration X</th>
                   <th className="text-left py-2">Acceleration Y</th>
@@ -151,16 +162,75 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
                 {data.map((point) => (
                   <tr key={point.id} className="border-b">
                     <td className="py-2">{point.id}</td>
-                    <td className="py-2">{new Date(point.timestamp).toLocaleString()}</td>
-                    <td className="py-2">{point.radar}</td>
-                    <td className="py-2">{point.accelerationX}</td>
-                    <td className="py-2">{point.accelerationY}</td>
-                    <td className="py-2">{point.accelerationZ}</td>
-                    <td className="py-2">{point.distance}</td>
+                    <td className="py-2">{point.sensorTime?.toString()}</td>
+                    <td className="py-2">{point.radar?.toFixed(6)}</td>
+                    <td className="py-2">{point.accelerationX?.toFixed(6)}</td>
+                    <td className="py-2">{point.accelerationY?.toFixed(6)}</td>
+                    <td className="py-2">{point.accelerationZ?.toFixed(6)}</td>
+                    <td className="py-2">{point.distance?.toFixed(6)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Time Series Plots</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-8">
+            {sensorInfo.type === 'RADAR' && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">Radar Data</h3>
+                <TimeSeriesPlot
+                  times={plotData.times}
+                  data={plotData.radar}
+                  label="Radar"
+                  color="rgb(75, 192, 192)"
+                />
+              </div>
+            )}
+            
+            {sensorInfo.type === 'ACCELEROMETER' && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">Acceleration Data</h3>
+                <div className="space-y-8">
+                  <TimeSeriesPlot
+                    times={plotData.times}
+                    data={plotData.accelerationX}
+                    label="X Acceleration"
+                    color="rgb(255, 99, 132)"
+                  />
+                  <TimeSeriesPlot
+                    times={plotData.times}
+                    data={plotData.accelerationY}
+                    label="Y Acceleration"
+                    color="rgb(75, 192, 192)"
+                  />
+                  <TimeSeriesPlot
+                    times={plotData.times}
+                    data={plotData.accelerationZ}
+                    label="Z Acceleration"
+                    color="rgb(153, 102, 255)"
+                  />
+                </div>
+              </div>
+            )}
+
+            {sensorInfo.type === 'LD' && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">Distance Data</h3>
+                <TimeSeriesPlot
+                  times={plotData.times}
+                  data={plotData.distance}
+                  label="Distance"
+                  color="rgb(75, 192, 192)"
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

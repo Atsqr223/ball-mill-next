@@ -27,6 +27,7 @@ ChartJS.register(
 interface SensorReading {
   id: number;
   timestamp: string;
+  sensor_time: number;
   value?: number;
   voltage?: number;
   x?: number;
@@ -80,9 +81,7 @@ export default function AnalysisHistory({ analyses, locationId }: AnalysisHistor
   }
 
   const getChartData = (analysis: Analysis) => {
-    const labels = analysis.data.map((d) =>
-      new Date(d.timestamp).toLocaleTimeString()
-    );
+    const labels = analysis.data.map((d) => d.sensor_time.toString());
 
     switch (analysis.session.sensorType) {
       case 'LD':

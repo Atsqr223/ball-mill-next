@@ -37,13 +37,16 @@ export const sensorData = pgTable('sensor_data', {
   accelerationZ: real('acceleration_z'),
   // Radar data
   radar: real('radar'),
-  timestamp: timestamp('timestamp').notNull(),
+  // Time values
+  sensorTime: real('sensor_time'), // High-precision decimal time from sensor
+  timestamp: timestamp('timestamp').notNull(), // Database record timestamp
   metadata: jsonb('metadata'), // Additional measurement metadata
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   sensorIdx: index('sensor_data_sensor_idx').on(table.sensorId),
   sessionIdx: index('sensor_data_session_idx').on(table.acquisitionSessionId),
   timestampIdx: index('sensor_data_timestamp_idx').on(table.timestamp),
+  sensorTimeIdx: index('sensor_data_sensor_time_idx').on(table.sensorTime),
 }))
 
 export const acquisitionSessions = pgTable('acquisition_sessions', {

@@ -10,6 +10,7 @@ interface DataAcquisitionProps {
 
 interface SensorDataPoint {
   timestamp: string;
+  sensor_time: number;
   value?: number;
   x?: number;
   y?: number;

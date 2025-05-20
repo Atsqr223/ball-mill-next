@@ -54,6 +54,7 @@ export async function GET(
     const formattedData = data.map(point => ({
       id: point.id,
       timestamp: point.timestamp.toISOString(),
+      sensor_time: point.sensorTime,
       value: point.radar,
       x: point.accelerationX,
       y: point.accelerationY,

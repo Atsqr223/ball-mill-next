@@ -59,6 +59,7 @@ def process_sensor_data(file_path, sensor_type):
                     time_from_start = sample_index / 1000.0
                     data.append({
                         'distance': float(row[0]),  # Store voltage as distance
+                        'sensor_time': time_from_start,  # Store the sensor time
                         'timestamp': None,
                         'metadata': json.dumps({
                             'sample_index': sample_index,
@@ -72,9 +73,10 @@ def process_sensor_data(file_path, sensor_type):
                         'acceleration_x': float(row[1]),
                         'acceleration_y': float(row[2]),
                         'acceleration_z': float(row[3]),
-                        'timestamp': None,  # We'll use the actual time value
+                        'sensor_time': float(row[0]),  # Store the sensor time
+                        'timestamp': None,
                         'metadata': json.dumps({
-                            'time_from_start': float(row[0]),  # Store original time value
+                            'time_from_start': float(row[0]),
                             'unit': 'seconds'
                         })
                     })
@@ -82,9 +84,10 @@ def process_sensor_data(file_path, sensor_type):
                     # Radar data has time and voltage (to be stored as radar)
                     data.append({
                         'radar': float(row[1]),  # Store voltage in radar field
-                        'timestamp': None,  # We'll use the actual time value
+                        'sensor_time': float(row[0]),  # Store the sensor time
+                        'timestamp': None,
                         'metadata': json.dumps({
-                            'time_from_start': float(row[0]),  # Store original time value
+                            'time_from_start': float(row[0]),
                             'unit': 'seconds'
                         })
                     })
@@ -123,6 +126,7 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type, sess
             values = [
                 sensor_id,   # sensor_id
                 actual_timestamp,     # timestamp
+                reading['sensor_time'],  # sensor_time
                 reading['metadata'],      # metadata
             ]
             
@@ -133,7 +137,7 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type, sess
             # Add sensor-specific values
             # Construct the SQL query based on sensor type and session presence
             if sensor_type == 'LD':
-                fields = ['sensor_id', 'timestamp', 'metadata', 'distance']
+                fields = ['sensor_id', 'timestamp', 'sensor_time', 'metadata', 'distance']
                 if session_id is not None:
                     fields.insert(0, 'acquisition_session_id')
                 cursor.execute(
@@ -145,7 +149,7 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type, sess
                     values + [reading['distance']]
                 )
             elif sensor_type == 'ACCELEROMETER':
-                fields = ['sensor_id', 'timestamp', 'metadata', 
+                fields = ['sensor_id', 'timestamp', 'sensor_time', 'metadata', 
                          'acceleration_x', 'acceleration_y', 'acceleration_z']
                 if session_id is not None:
                     fields.insert(0, 'acquisition_session_id')
@@ -162,7 +166,7 @@ def upload_data_to_postgres(file_path, location_id, sensor_id, sensor_type, sess
                     ]
                 )
             elif sensor_type == 'RADAR':
-                fields = ['sensor_id', 'timestamp', 'metadata', 'radar']
+                fields = ['sensor_id', 'timestamp', 'sensor_time', 'metadata', 'radar']
                 if session_id is not None:
                     fields.insert(0, 'acquisition_session_id')
                 cursor.execute(
