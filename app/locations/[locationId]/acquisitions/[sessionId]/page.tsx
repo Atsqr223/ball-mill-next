@@ -4,7 +4,6 @@ import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import TimeSeriesPlot from '@/app/components/TimeSeriesPlot';
 
 function formatTimeAgo(date: Date) {
   const now = new Date();
@@ -65,7 +64,7 @@ async function getSession(sessionId: number) {
     .select()
     .from(sensorData)
     .where(eq(sensorData.acquisitionSessionId, session.id))
-    .orderBy(sensorData.timestamp);
+    .orderBy(sensorData.sensorTime);
 
   console.log('Session:', session);
   console.log('Sensor Info:', sensorInfo);
@@ -87,16 +86,6 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
   }
 
   const { session, sensorInfo, data } = result;
-
-  // Prepare data for the time series plot
-  const plotData = {
-    times: data.map(point => point.sensorTime || 0),
-    radar: data.map(point => point.radar || null),
-    accelerationX: data.map(point => point.accelerationX || null),
-    accelerationY: data.map(point => point.accelerationY || null),
-    accelerationZ: data.map(point => point.accelerationZ || null),
-    distance: data.map(point => point.distance || null),
-  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -172,65 +161,6 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
                 ))}
               </tbody>
             </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Time Series Plots</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-8">
-            {sensorInfo.type === 'RADAR' && (
-              <div>
-                <h3 className="text-lg font-medium mb-4">Radar Data</h3>
-                <TimeSeriesPlot
-                  times={plotData.times}
-                  data={plotData.radar}
-                  label="Radar"
-                  color="rgb(75, 192, 192)"
-                />
-              </div>
-            )}
-            
-            {sensorInfo.type === 'ACCELEROMETER' && (
-              <div>
-                <h3 className="text-lg font-medium mb-4">Acceleration Data</h3>
-                <div className="space-y-8">
-                  <TimeSeriesPlot
-                    times={plotData.times}
-                    data={plotData.accelerationX}
-                    label="X Acceleration"
-                    color="rgb(255, 99, 132)"
-                  />
-                  <TimeSeriesPlot
-                    times={plotData.times}
-                    data={plotData.accelerationY}
-                    label="Y Acceleration"
-                    color="rgb(75, 192, 192)"
-                  />
-                  <TimeSeriesPlot
-                    times={plotData.times}
-                    data={plotData.accelerationZ}
-                    label="Z Acceleration"
-                    color="rgb(153, 102, 255)"
-                  />
-                </div>
-              </div>
-            )}
-
-            {sensorInfo.type === 'LD' && (
-              <div>
-                <h3 className="text-lg font-medium mb-4">Distance Data</h3>
-                <TimeSeriesPlot
-                  times={plotData.times}
-                  data={plotData.distance}
-                  label="Distance"
-                  color="rgb(75, 192, 192)"
-                />
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
