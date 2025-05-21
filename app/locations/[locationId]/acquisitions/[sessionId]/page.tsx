@@ -4,41 +4,7 @@ import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-function formatTimeAgo(date: Date) {
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  const intervals = [
-    { label: 'second', seconds: 60 },
-    { label: 'minute', seconds: 3600 },
-    { label: 'hour', seconds: 86400 },
-    { label: 'day', seconds: 2592000 },
-    { label: 'month', seconds: 31536000 },
-    { label: 'year', seconds: Infinity },
-  ];
-
-  for (const interval of intervals) {
-    const count = Math.floor(seconds / interval.seconds);
-    if (count >= 1) {
-      return `${count} ${interval.label}${count > 1 ? 's' : ''} ago`;
-    }
-  }
-
-  return 'just now';
-}
-
-function formatTimestamp(timestamp: Date) {
-  return new Date(timestamp).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-}
+import { formatTimeAgo, formatTimestamp } from '@/lib/utils';
 
 interface PageProps {
   params: {

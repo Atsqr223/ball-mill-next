@@ -43,37 +43,22 @@ async function getRecentAnalyses(locationId: number) {
           .from(sensorData)
           .where(eq(sensorData.acquisitionSessionId, session.id));
 
-        const data = rawData.map(item => {
-          const baseData = {
-            id: item.id,
-            timestamp: item.timestamp.toISOString(),
-          };
-
-          switch (sensorInfo.type) {
-            case 'LD':
-              return {
-                ...baseData,
-                voltage: item.voltage || undefined,
-                unit: 'V',
-              };
-            case 'ACCELEROMETER':
-              return {
-                ...baseData,
-                x: item.accelerationX || undefined,
-                y: item.accelerationY || undefined,
-                z: item.accelerationZ || undefined,
-                unit: 'm/s²',
-              };
-            case 'RADAR':
-              return {
-                ...baseData,
-                distance: item.distance || undefined,
-                unit: 'm',
-              };
-            default:
-              return baseData;
-          }
-        });
+        const data = rawData.map(item => ({
+          id: item.id,
+          timestamp: item.timestamp.toISOString(),
+          sensor_time: item.sensorTime || 0,
+          x: item.accelerationX || undefined,
+          y: item.accelerationY || undefined,
+          z: item.accelerationZ || undefined,
+          distance: item.distance || undefined,
+          radar: item.radar || undefined,
+          acceleration_x: item.accelerationX || undefined,
+          acceleration_y: item.accelerationY || undefined,
+          acceleration_z: item.accelerationZ || undefined,
+          unit: sensorInfo.type === 'LD' ? 'm' : 
+                sensorInfo.type === 'ACCELEROMETER' ? 'm/s²' :
+                sensorInfo.type === 'RADAR' ? 'm' : undefined
+        }));
 
         return {
           session: {
@@ -96,15 +81,6 @@ async function getRecentAnalyses(locationId: number) {
     console.error('Failed to fetch analyses:', error);
     return [];
   }
-}
-
-interface DataPoint {
-  timestamp: string;
-  radar?: number;
-  acceleration_x?: number;
-  acceleration_y?: number;
-  acceleration_z?: number;
-  distance?: number;
 }
 
 export default async function LocationPage({

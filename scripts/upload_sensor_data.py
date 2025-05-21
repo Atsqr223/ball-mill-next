@@ -23,7 +23,7 @@
 # sensor types:
 # RADAR
 # ACCELEROMETER
-# LD
+# LD    
 # MICROPHONE
 
 # operating command:
@@ -53,12 +53,12 @@ def process_sensor_data(file_path, sensor_type):
         for row in reader:
             try:
                 if sensor_type == 'LD':
-                    # LD sensor data has voltage (to be stored as distance) and sample_index
+                    # LD sensor data has distance measurement and sample_index
                     sample_index = int(row[1])
                     # Assuming 1000 Hz sampling rate for LD sensor
                     time_from_start = sample_index / 1000.0
                     data.append({
-                        'distance': float(row[0]),  # Store voltage as distance
+                        'distance': float(row[0]),  # Store distance measurement
                         'sensor_time': time_from_start,  # Store the sensor time
                         'timestamp': None,
                         'metadata': json.dumps({

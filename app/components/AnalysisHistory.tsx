@@ -89,8 +89,8 @@ export default function AnalysisHistory({ analyses, locationId }: AnalysisHistor
           labels,
           datasets: [
             {
-              label: 'Voltage (V)',
-              data: analysis.data.map((d) => d.voltage),
+              label: 'Distance (m)',
+              data: analysis.data.map((d) => d.distance),
               borderColor: 'rgb(75, 192, 192)',
               tension: 0.1,
             },
