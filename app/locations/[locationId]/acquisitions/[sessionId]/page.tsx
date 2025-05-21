@@ -5,6 +5,15 @@ import { eq } from 'drizzle-orm';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeAgo, formatTimestamp } from '@/lib/utils';
+import TimeSeriesPlot from './TimeSeriesPlot';
+
+// Normalize sensor type to match schema
+function normalizeSensorType(type: string): string {
+  const normalized = type.toUpperCase();
+  if (normalized === 'AUDIO') return 'ACCELEROMETER';
+  if (normalized === 'LASER_DISTANCE') return 'LD';
+  return normalized;
+}
 
 interface PageProps {
   params: {
@@ -52,6 +61,7 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
   }
 
   const { session, sensorInfo, data } = result;
+  const normalizedSensorType = normalizeSensorType(sensorInfo.type);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -75,7 +85,7 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-gray-500">Sensor Type</p>
-              <p className="font-medium">{sensorInfo.type}</p>
+              <p className="font-medium">{normalizedSensorType}</p>
             </div>
             <div>
               <p className="text-gray-500">Data Points</p>
@@ -91,6 +101,17 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
                 <p className="font-medium">{formatTimestamp(session.endTime)}</p>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Time Series Plot</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[400px]">
+            <TimeSeriesPlot data={data} sensorType={normalizedSensorType} />
           </div>
         </CardContent>
       </Card>

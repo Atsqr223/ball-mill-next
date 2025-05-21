@@ -3,6 +3,14 @@ import { db } from '@/lib/db';
 import { sensorData, sensors, acquisitionSessions } from '@/lib/schema';
 import { eq, desc, and, inArray } from 'drizzle-orm';
 
+// Normalize sensor type to match schema
+function normalizeSensorType(type: string): string {
+  const normalized = type.toUpperCase();
+  if (normalized === 'AUDIO') return 'ACCELEROMETER';
+  if (normalized === 'LASER_DISTANCE') return 'LD';
+  return normalized;
+}
+
 export async function POST(request: Request) {
   try {
     const { locationId, sensorId, numDataPoints, sessionId } = await request.json();
@@ -60,7 +68,7 @@ export async function POST(request: Request) {
       })
       .where(inArray(sensorData.id, data.map(point => point.id)));
 
-    // Update session status to completed
+    // Update session status to completed with normalized sensor type
     await db
       .update(acquisitionSessions)
       .set({ 
@@ -68,7 +76,7 @@ export async function POST(request: Request) {
         endTime: new Date(),
         metadata: { 
           numDataPoints: data.length,
-          sensorType: sensor.type
+          sensorType: normalizeSensorType(sensor.type)
         }
       })
       .where(eq(acquisitionSessions.id, sessionId));
