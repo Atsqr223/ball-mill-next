@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeAgo, formatTimestamp } from '@/lib/utils';
 import TimeSeriesPlot from './TimeSeriesPlot';
+import FFTPlot from './FFTPlot';
 
 // Normalize sensor type to match schema
 function normalizeSensorType(type: string): string {
@@ -115,6 +116,19 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {normalizedSensorType === 'RADAR' && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Frequency Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <FFTPlot data={data} sensorType={normalizedSensorType} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mb-8">
         <CardHeader>
