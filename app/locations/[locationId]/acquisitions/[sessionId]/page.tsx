@@ -2,11 +2,12 @@ import { notFound } from 'next/navigation';
 import { db } from '@/lib/db';
 import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq } from 'drizzle-orm';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatTimeAgo, formatTimestamp } from '@/lib/utils';
 import TimeSeriesPlot from './TimeSeriesPlot';
 import FFTPlot from './FFTPlot';
+import SpectrogramPlot from './SpectrogramPlot';
 
 // Normalize sensor type to match schema
 function normalizeSensorType(type: string): string {
@@ -125,6 +126,24 @@ export default async function AcquisitionSessionPage({ params }: PageProps) {
           <CardContent>
             <div className="h-[400px]">
               <FFTPlot data={data} sensorType={normalizedSensorType} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(normalizedSensorType === 'LD' || normalizedSensorType === 'ACCELEROMETER') && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Time-Frequency Analysis</CardTitle>
+            <CardDescription>
+              {normalizedSensorType === 'LD' 
+                ? 'Spectrogram showing how distance frequencies change over time'
+                : 'Spectrogram showing how acceleration frequencies change over time'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px]">
+              <SpectrogramPlot data={data} sensorType={normalizedSensorType} />
             </div>
           </CardContent>
         </Card>
