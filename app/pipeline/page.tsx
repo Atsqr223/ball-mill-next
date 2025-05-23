@@ -28,7 +28,7 @@ export default function PipelinePage() {
 
   const connectToPi = async () => {
     try {
-      const response = await fetch("http://localhost:5000/connect", {
+      const response = await fetch(`http://${piIp}:5000/connect`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,7 +51,7 @@ export default function PipelinePage() {
     } catch (error) {
       toast({
         title: "Connection Error",
-        description: "Failed to connect to Raspberry Pi",
+        description: `Failed to connect to Raspberry Pi at ${piIp}. Make sure the server is running and accessible.`,
         variant: "destructive",
       });
     }
@@ -59,7 +59,7 @@ export default function PipelinePage() {
 
   const disconnectFromPi = async () => {
     try {
-      const response = await fetch("http://localhost:5000/disconnect", {
+      const response = await fetch(`http://${piIp}:5000/disconnect`, {
         method: "POST",
       });
 
@@ -87,7 +87,7 @@ export default function PipelinePage() {
 
     try {
       const newState = !valveStates[index];
-      const response = await fetch("http://localhost:5000/valve", {
+      const response = await fetch(`http://${piIp}:5000/valve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -125,7 +125,7 @@ export default function PipelinePage() {
     if (!connected) return;
 
     try {
-      const response = await fetch("http://localhost:5000/heatmap");
+      const response = await fetch(`http://${piIp}:5000/heatmap`);
       if (!response.ok) {
         throw new Error("Failed to fetch heatmap data");
       }
@@ -136,16 +136,9 @@ export default function PipelinePage() {
     }
   };
 
-  useEffect(() => {
-    if (connected) {
-      const interval = setInterval(fetchHeatmapData, 100);
-      return () => clearInterval(interval);
-    }
-  }, [connected]);
-
   const switchMode = async (mode: 'live' | 'pickle') => {
     try {
-      const response = await fetch('http://localhost:5000/mode', {
+      const response = await fetch(`http://${piIp}:5000/mode`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,9 +165,17 @@ export default function PipelinePage() {
     }
   };
 
+  // Add back the useEffect for periodic heatmap updates
+  useEffect(() => {
+    if (connected) {
+      const interval = setInterval(fetchHeatmapData, 100);
+      return () => clearInterval(interval);
+    }
+  }, [connected, piIp]); // Added piIp as dependency since it's used in fetchHeatmapData
+
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Acoustics Guided Localization</h1>
+      <h1 className="text-2xl font-bold mb-4">Pipeline Leakage Detection</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>

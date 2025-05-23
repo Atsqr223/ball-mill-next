@@ -12,6 +12,7 @@ import nidaqmx
 from nidaqmx import constants
 from nidaqmx.constants import AcquisitionType, READ_ALL_AVAILABLE, TerminalConfiguration
 from nidaqmx import stream_readers
+import socket
 
 # Import the required functions from the original implementation
 sys.path.append('pipe/N_MIC_LIVEDEMO_PLAYBACK')
@@ -358,6 +359,12 @@ def get_heatmap():
             return jsonify({'error': 'No heatmap data available'}), 503
         return jsonify({'heatmap': latest_heatmap})
 
+@app.route('/ip', methods=['GET'])
+def get_ip():
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    return jsonify({'ip': local_ip})
+
 if __name__ == '__main__':
     # Start the audio acquisition thread
     audio_thread = threading.Thread(target=acquire_audio_data, daemon=True)
@@ -367,5 +374,10 @@ if __name__ == '__main__':
     heatmap_thread = threading.Thread(target=generate_heatmap, daemon=True)
     heatmap_thread.start()
     
-    logging.info("Starting pipeline server on http://localhost:5000")
+    # Get the local IP address
+    hostname = socket.gethostname()
+    local_ip = socket.gethostbyname(hostname)
+    
+    logging.info(f"Starting pipeline server on http://{local_ip}:5000")
+    logging.info("You can access the server from other devices using this IP address")
     app.run(host='0.0.0.0', port=5000, debug=True) 
