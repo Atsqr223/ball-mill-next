@@ -4,11 +4,17 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
 import sys
+import numpy as np
+import time
+import threading
+import math
+import pickle
+import os
 
 app = Flask(__name__)
 CORS(app)
 
-# Configure logging to show more visible output
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -16,6 +22,57 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
+
+# Constants from the original implementation
+PIPE_LENGTH_INTERVALS = 100  # Width of the heatmap
+PIPE_DIAMETER_INTERVALS = 20  # Height of the heatmap
+SAMPLING_RATE = 48000  # Hz
+N_MICS = 4
+
+# Global variables for heatmap simulation
+latest_heatmap = None
+heatmap_lock = threading.Lock()
+
+def generate_heatmap():
+    """Generate a simulated heatmap with dimensions matching the original implementation"""
+    # Create base heatmap with correct dimensions
+    heatmap = np.zeros((PIPE_DIAMETER_INTERVALS, PIPE_LENGTH_INTERVALS))
+    
+    # Current time for animation
+    t = time.time()
+    
+    # Create a moving heat source
+    center_x = int(PIPE_LENGTH_INTERVALS * (0.5 + 0.3 * math.sin(t)))
+    center_y = int(PIPE_DIAMETER_INTERVALS * (0.5 + 0.3 * math.cos(t)))
+    
+    # Generate Gaussian heat distribution
+    for y in range(PIPE_DIAMETER_INTERVALS):
+        for x in range(PIPE_LENGTH_INTERVALS):
+            # Calculate distance from center
+            dx = x - center_x
+            dy = y - center_y
+            distance = math.sqrt(dx*dx + dy*dy)
+            
+            # Create Gaussian heat distribution
+            heat = math.exp(-(distance * distance) / 50)  # Adjusted for flatter distribution
+            heatmap[y, x] = heat
+    
+    # Normalize to 0-1 range
+    heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min())
+    
+    return heatmap.tolist()
+
+def update_heatmap():
+    """Background thread to continuously update the heatmap"""
+    global latest_heatmap
+    while True:
+        try:
+            new_heatmap = generate_heatmap()
+            with heatmap_lock:
+                latest_heatmap = new_heatmap
+        except Exception as e:
+            logging.error(f"Error generating heatmap: {e}")
+        time.sleep(0.1)  # Update every 100ms
 
 # Simulate GPIO control
 class MockGPIO:
@@ -68,6 +125,12 @@ def connect():
         logging.error(f"Connection error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/disconnect', methods=['POST'])
+def disconnect():
+    if mock_gpio.disconnect():
+        return jsonify({'status': 'disconnected'})
+    return jsonify({'error': 'Failed to disconnect'}), 500
+
 @app.route('/valve', methods=['POST'])
 def control_valve():
     logging.info("Received valve control request")
@@ -116,6 +179,17 @@ def get_status():
         logging.error(f"Status error: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/heatmap', methods=['GET'])
+def get_heatmap():
+    with heatmap_lock:
+        if latest_heatmap is None:
+            return jsonify({'error': 'No heatmap data available'}), 503
+        return jsonify({'heatmap': latest_heatmap})
+
 if __name__ == '__main__':
+    # Start the heatmap update thread
+    update_thread = threading.Thread(target=update_heatmap, daemon=True)
+    update_thread.start()
+    
     logging.info("Starting mock pipeline server on http://localhost:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)

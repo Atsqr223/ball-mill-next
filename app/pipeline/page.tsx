@@ -1,201 +1,269 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import Image from 'next/image';
+import { useEffect, useState } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Heatmap } from "@/components/heatmap";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/components/ui/use-toast";
+import Image from "next/image";
+import { AlertCircle } from "lucide-react";
 
-export default function PipelineControl() {
+interface ValveState {
+  index: number;
+  isOpen: boolean;
+}
+
+interface HeatmapData {
+  heatmap: number[][];
+}
+
+export default function PipelinePage() {
+  const [connected, setConnected] = useState(false);
   const [piIp, setPiIp] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
   const [valveStates, setValveStates] = useState([false, false, false]);
-  const [currentImage, setCurrentImage] = useState('/pipe_leakage/pipe_default.png');
-  const [error, setError] = useState<string | null>(null);
+  const [heatmapData, setHeatmapData] = useState<number[][]>([]);
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  const { toast } = useToast();
 
-  // Check connection status periodically
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/pipeline/status');
-        if (!response.ok) {
-          setIsConnected(false);
-          setError('Lost connection to server');
-        }
-      } catch (error) {
-        setIsConnected(false);
-        setError('Failed to check connection status');
-      }
-    };
-
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
-  }, [isConnected]);
-
-  const handleConnect = async () => {
-    setError(null);
+  const connectToPi = async () => {
     try {
-      const response = await fetch('/api/pipeline/connect', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/connect", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ piIp }),
       });
 
-      if (response.ok) {
-        setIsConnected(true);
-        // Get initial valve states after connecting
-        const statusResponse = await fetch('/api/pipeline/status');
-        if (statusResponse.ok) {
-          const data = await statusResponse.json();
-          if (data.valveStates) {
-            setValveStates(data.valveStates);
-            // Update image based on valve states
-            const openValveIndex = data.valveStates.findIndex((state: boolean) => state);
-            if (openValveIndex !== -1) {
-              setCurrentImage(`/pipe_leakage/pipe_leak_${openValveIndex + 1}.png`);
-            } else {
-              setCurrentImage('/pipe_leakage/pipe_default.png');
-            }
-          }
-        }
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to connect to Raspberry Pi');
+      if (!response.ok) {
+        throw new Error("Failed to connect");
+      }
+
+      const data = await response.json();
+      if (data.status === "connected") {
+        setConnected(true);
+        toast({
+          title: "Connected",
+          description: "Successfully connected to Raspberry Pi",
+        });
       }
     } catch (error) {
-      setError('Failed to connect to Raspberry Pi');
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to Raspberry Pi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const disconnectFromPi = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/disconnect", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to disconnect");
+      }
+
+      setConnected(false);
+      setHeatmapData([]);
+      toast({
+        title: "Disconnected",
+        description: "Successfully disconnected from Raspberry Pi",
+      });
+    } catch (error) {
+      toast({
+        title: "Disconnection Error",
+        description: "Failed to disconnect from Raspberry Pi",
+        variant: "destructive",
+      });
     }
   };
 
   const toggleValve = async (index: number) => {
-    if (!isConnected) return;
-    setError(null);
-
-    // Update UI immediately for better responsiveness
-    const newStates = [...valveStates];
-    newStates[index] = !valveStates[index];
-    setValveStates(newStates);
-    
-    // Update image based on valve state
-    if (newStates[index]) {
-      setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-    } else {
-      setCurrentImage('/pipe_leakage/pipe_default.png');
-    }
+    if (!connected) return;
 
     try {
-      const response = await fetch('/api/pipeline/valve', {
-        method: 'POST',
+      const newState = !valveStates[index];
+      const response = await fetch("http://localhost:5000/valve", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           valveIndex: index,
-          state: newStates[index]  // Use the new state we just set
+          state: newState,
         }),
       });
 
       if (!response.ok) {
-        // If the server request failed, revert the UI state
-        const revertStates = [...valveStates];
-        revertStates[index] = !newStates[index];
-        setValveStates(revertStates);
-        
-        // Revert the image
-        if (revertStates[index]) {
-          setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-        } else {
-          setCurrentImage('/pipe_leakage/pipe_default.png');
-        }
-
-        const data = await response.json();
-        setError(data.error || 'Failed to toggle valve');
+        throw new Error("Failed to control valve");
       }
+
+      setValveStates((prev) =>
+        prev.map((valve, i) =>
+          i === index ? newState : valve
+        )
+      );
+
+      toast({
+        title: `Valve ${index + 1} ${newState ? "Opened" : "Closed"}`,
+        description: `Successfully ${newState ? "opened" : "closed"} valve ${index + 1}`,
+      });
     } catch (error) {
-      // If the request failed, revert the UI state
-      const revertStates = [...valveStates];
-      revertStates[index] = !newStates[index];
-      setValveStates(revertStates);
-      
-      // Revert the image
-      if (revertStates[index]) {
-        setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-      } else {
-        setCurrentImage('/pipe_leakage/pipe_default.png');
+      toast({
+        title: "Valve Control Error",
+        description: "Failed to control valve",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const fetchHeatmapData = async () => {
+    if (!connected) return;
+
+    try {
+      const response = await fetch("http://localhost:5000/heatmap");
+      if (!response.ok) {
+        throw new Error("Failed to fetch heatmap data");
+      }
+      const data = await response.json();
+      setHeatmapData(data.heatmap);
+    } catch (error) {
+      console.error("Error fetching heatmap data:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (connected) {
+      const interval = setInterval(fetchHeatmapData, 100);
+      return () => clearInterval(interval);
+    }
+  }, [connected]);
+
+  const switchMode = async (mode: 'live' | 'pickle') => {
+    try {
+      const response = await fetch('http://localhost:5000/mode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mode }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to switch mode');
       }
 
-      setError('Failed to toggle valve');
+      const data = await response.json();
+      setIsLiveMode(mode === 'live');
+      toast({
+        title: "Mode Changed",
+        description: `Switched to ${mode} mode`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to switch mode",
+        variant: "destructive",
+      });
     }
   };
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Pipeline Control</h1>
+      <h1 className="text-2xl font-bold mb-4">Acoustics Guided Localization</h1>
       
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Raspberry Pi Connection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <Label htmlFor="piIp">Raspberry Pi IP Address</Label>
-              <Input
-                id="piIp"
-                value={piIp}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPiIp(e.target.value)}
-                placeholder="e.g., 192.168.1.100"
-                disabled={isConnected}
-              />
-            </div>
-            <Button 
-              onClick={handleConnect}
-              disabled={!piIp || isConnected}
-            >
-              {isConnected ? 'Connected' : 'Connect'}
-            </Button>
-          </div>
-          {error && (
-            <p className="mt-2 text-sm text-red-500">{error}</p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={piIp}
+                  onChange={(e) => setPiIp(e.target.value)}
+                  placeholder="Raspberry Pi IP"
+                  className="flex-1 p-2 border rounded"
+                />
+                <Button onClick={connected ? disconnectFromPi : connectToPi}>
+                  {connected ? 'Disconnect' : 'Connect'}
+                </Button>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Button
+                  onClick={() => switchMode('live')}
+                  variant={isLiveMode ? "default" : "outline"}
+                  disabled={!connected}
+                >
+                  Live Mode
+                </Button>
+                <Button
+                  onClick={() => switchMode('pickle')}
+                  variant={!isLiveMode ? "default" : "outline"}
+                  disabled={!connected}
+                >
+                  Pickle Mode
+                </Button>
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Valve Control</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              {[0, 1, 2].map((index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <Label>Valve {index + 1}</Label>
-                  <Switch
-                    checked={valveStates[index]}
-                    onCheckedChange={() => toggleValve(index)}
-                    disabled={!isConnected}
+              {connected && (
+                <div className="grid grid-cols-3 gap-2">
+                  {[0, 1, 2].map((index) => (
+                    <Button
+                      key={index}
+                      onClick={() => toggleValve(index)}
+                      variant={valveStates[index] ? "default" : "outline"}
+                    >
+                      Valve {index + 1}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
+              {connected && (
+                <div className="mt-4">
+                  <img
+                    src={valveStates.some(state => state) ? 
+                      `/pipe_leakage/pipe_leak_${valveStates.findIndex(state => state) + 1}.png` : 
+                      '/pipe_leakage/pipe_default.png'}
+                    alt="Pipeline Status"
+                    className="w-full h-auto"
                   />
                 </div>
-              ))}
+              )}
             </div>
-            <div className="relative h-[300px] w-full">
-              <Image
-                src={currentImage}
-                alt="Pipeline Status"
-                fill
-                className="object-contain"
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <h2 className="text-xl font-semibold mb-4">Acoustics Guided Localization</h2>
+            {connected ? (
+              <div className="h-[400px]">
+                {heatmapData.length > 0 ? (
+                  <Heatmap data={heatmapData} />
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-gray-500">Waiting for heatmap data...</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Not Connected</AlertTitle>
+                <AlertDescription>
+                  Please connect to the Raspberry Pi to view the heatmap.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 } 
