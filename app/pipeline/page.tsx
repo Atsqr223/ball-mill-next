@@ -24,11 +24,16 @@ export default function PipelinePage() {
   const [valveStates, setValveStates] = useState([false, false, false]);
   const [heatmapData, setHeatmapData] = useState<number[][]>([]);
   const [isLiveMode, setIsLiveMode] = useState(false);
+  const [useMockPi, setUseMockPi] = useState(false);
   const { toast } = useToast();
+
+  const getValveServerUrl = () => {
+    return useMockPi ? 'http://localhost:5003' : 'http://localhost:5002';
+  };
 
   const connectToPi = async () => {
     try {
-      const response = await fetch(`http://${piIp}:5000/connect`, {
+      const response = await fetch(`${getValveServerUrl()}/connect`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -45,13 +50,13 @@ export default function PipelinePage() {
         setConnected(true);
         toast({
           title: "Connected",
-          description: "Successfully connected to Raspberry Pi",
+          description: `Successfully connected to ${useMockPi ? 'mock' : 'real'} Raspberry Pi`,
         });
       }
     } catch (error) {
       toast({
         title: "Connection Error",
-        description: `Failed to connect to Raspberry Pi at ${piIp}. Make sure the server is running and accessible.`,
+        description: `Failed to connect to ${useMockPi ? 'mock' : 'real'} Raspberry Pi. Make sure the server is running and accessible.`,
         variant: "destructive",
       });
     }
@@ -59,7 +64,7 @@ export default function PipelinePage() {
 
   const disconnectFromPi = async () => {
     try {
-      const response = await fetch(`http://${piIp}:5000/disconnect`, {
+      const response = await fetch(`${getValveServerUrl()}/disconnect`, {
         method: "POST",
       });
 
@@ -71,12 +76,12 @@ export default function PipelinePage() {
       setHeatmapData([]);
       toast({
         title: "Disconnected",
-        description: "Successfully disconnected from Raspberry Pi",
+        description: `Successfully disconnected from ${useMockPi ? 'mock' : 'real'} Raspberry Pi`,
       });
     } catch (error) {
       toast({
         title: "Disconnection Error",
-        description: "Failed to disconnect from Raspberry Pi",
+        description: `Failed to disconnect from ${useMockPi ? 'mock' : 'real'} Raspberry Pi`,
         variant: "destructive",
       });
     }
@@ -87,7 +92,7 @@ export default function PipelinePage() {
 
     try {
       const newState = !valveStates[index];
-      const response = await fetch(`http://${piIp}:5000/valve`, {
+      const response = await fetch(`${getValveServerUrl()}/valve`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -125,7 +130,7 @@ export default function PipelinePage() {
     if (!connected) return;
 
     try {
-      const response = await fetch(`http://${piIp}:5000/heatmap`);
+      const response = await fetch(`http://localhost:5001/heatmap`);
       if (!response.ok) {
         throw new Error("Failed to fetch heatmap data");
       }
@@ -138,7 +143,7 @@ export default function PipelinePage() {
 
   const switchMode = async (mode: 'live' | 'pickle') => {
     try {
-      const response = await fetch(`http://${piIp}:5000/mode`, {
+      const response = await fetch(`http://localhost:5001/mode`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,10 +193,23 @@ export default function PipelinePage() {
                   onChange={(e) => setPiIp(e.target.value)}
                   placeholder="Raspberry Pi IP"
                   className="flex-1 p-2 border rounded"
+                  disabled={useMockPi}
                 />
                 <Button onClick={connected ? disconnectFromPi : connectToPi}>
                   {connected ? 'Disconnect' : 'Connect'}
                 </Button>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={useMockPi}
+                    onChange={(e) => setUseMockPi(e.target.checked)}
+                    className="form-checkbox"
+                  />
+                  <span>Use Mock Raspberry Pi</span>
+                </label>
               </div>
               
               <div className="flex items-center space-x-2">
