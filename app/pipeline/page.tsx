@@ -7,12 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import Image from 'next/image';
+import { HeatMap } from '@/components/ui/heatmap';
+import { cn } from '@/lib/utils';
 
 export default function PipelineControl() {
   const [piIp, setPiIp] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [valveStates, setValveStates] = useState([false, false, false]);
   const [currentImage, setCurrentImage] = useState('/pipe_leakage/pipe_default.png');
+  const [heatmapData, setHeatmapData] = useState(null);
+  const [heatmapError, setHeatmapError] = useState(null);
   const [error, setError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
@@ -20,6 +24,7 @@ export default function PipelineControl() {
   useEffect(() => {
     if (!isConnected) return;
 
+    // Check pipeline status
     const checkStatus = async () => {
       try {
         const response = await fetch('/api/pipeline/status');
@@ -33,8 +38,30 @@ export default function PipelineControl() {
       }
     };
 
-    const interval = setInterval(checkStatus, 5000);
-    return () => clearInterval(interval);
+    // Fetch heatmap data
+    const fetchHeatmap = async () => {
+      try {
+        const response = await fetch('/api/pipeline/heatmap');
+        if (response.ok) {
+          const data = await response.json();
+          setHeatmapData(data.heatmap);
+          setHeatmapError(null);
+        } else {
+          setHeatmapError('Failed to fetch heatmap data');
+        }
+      } catch (error) {
+        setHeatmapError('Error fetching heatmap data');
+      }
+    };
+
+    // Set up intervals
+    const statusInterval = setInterval(checkStatus, 5000);
+    const heatmapInterval = setInterval(fetchHeatmap, 50); // Update heatmap every 50ms to match audio server's rate
+
+    return () => {
+      clearInterval(statusInterval);
+      clearInterval(heatmapInterval);
+    };
   }, [isConnected]);
 
   const handleConnect = async () => {
@@ -215,35 +242,64 @@ export default function PipelineControl() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle>Valve Control</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              {[0, 1, 2].map((index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <Label>Valve {index + 1}</Label>
-                  <Switch
-                    checked={valveStates[index]}
-                    onCheckedChange={() => toggleValve(index)}
-                    disabled={!isConnected}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="relative h-[300px] w-full">
-              <Image
-                src={currentImage}
-                alt="Pipeline Status"
-                fill
-                className="object-contain"
-              />
-            </div>
+          <div className="grid grid-cols-3 gap-4">
+            {valveStates.map((state, index) => (
+              <div key={index} className="flex flex-col items-center space-y-2">
+                <Switch
+                  id={`valve${index}`}
+                  checked={state}
+                  onCheckedChange={() => toggleValve(index)}
+                />
+                <Label htmlFor={`valve${index}`} className="text-sm">
+                  Valve {index + 1}
+                </Label>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
+
+      {error && (
+        <div className="bg-red-50 text-red-500 p-4 rounded-md mb-4">
+          {error}
+        </div>
+      )}
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Audio Heatmap</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {heatmapError && (
+            <div className="bg-red-50 text-red-500 p-4 rounded-md mb-4">
+              {heatmapError}
+            </div>
+          )}
+          <div className="relative aspect-video">
+            <HeatMap
+              data={heatmapData}
+              className={cn(
+                "w-full h-full",
+                !heatmapData && "opacity-50"
+              )}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="relative aspect-video mb-6">
+        <Image
+          src={currentImage}
+          alt="Pipeline"
+          fill
+          className="object-contain"
+        />
+      </div>
     </div>
   );
 }

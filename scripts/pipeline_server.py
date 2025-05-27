@@ -209,30 +209,26 @@ def get_status():
 @app.route('/disconnect', methods=['POST'])
 def disconnect():
     try:
-        global is_connected, factory, valves
+        global is_connected, factory, valves, valve_states
         if not is_connected:
             return jsonify({'success': True})
 
-        # Keep the valve states in memory but clean up GPIO
+        # Reset valve states to default (all off)
+        valve_states = [False, False, False]
+        
+        # Clean up GPIO connections
         if factory:
             for valve in valves:
                 try:
+                    valve.off()  # Ensure valves are turned off
                     valve.close()
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"Error closing valve: {str(e)}")
             valves = []
             factory = None
             is_connected = False
 
         return jsonify({'success': True})
-    except Exception as e:
-        logger.error(f"Disconnect error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-            
-        if cleanup_gpio():
-            return jsonify({'success': True})
-        else:
-            raise Exception("Failed to cleanup GPIO connections")
     except Exception as e:
         logger.error(f"Disconnect error: {str(e)}")
         return jsonify({'error': str(e)}), 500
