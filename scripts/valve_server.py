@@ -27,6 +27,18 @@ class ValveController:
 
     def connect(self, pi_ip):
         try:
+            # Try to connect to pigpio daemon with a timeout
+            import socket
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)  # 5 second timeout
+            try:
+                sock.connect((pi_ip, 8888))
+                sock.close()
+            except (socket.timeout, ConnectionRefusedError):
+                logging.error(f"Could not connect to pigpio daemon at {pi_ip}:8888")
+                logging.error("Please ensure the pigpio daemon is running on the Raspberry Pi (sudo pigpiod)")
+                return False
+            
             self.factory = PiGPIOFactory(host=pi_ip)
             self.leds = [LED(pin, pin_factory=self.factory) for pin in self.button_pins]
             self.connected = True
@@ -34,6 +46,8 @@ class ValveController:
             return True
         except Exception as e:
             logging.error(f"Error connecting to Raspberry Pi: {e}")
+            if "connection refused" in str(e).lower():
+                logging.error("Please ensure the pigpio daemon is running on the Raspberry Pi (sudo pigpiod)")
             return False
 
     def disconnect(self):
@@ -151,4 +165,4 @@ def get_status():
 
 if __name__ == '__main__':
     logging.info("Starting valve control server on port 5002")
-    app.run(host='0.0.0.0', port=5002, debug=True) 
+    app.run(host='0.0.0.0', port=5002, debug=True)
