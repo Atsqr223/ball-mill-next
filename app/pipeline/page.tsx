@@ -14,6 +14,7 @@ export default function PipelineControl() {
   const [valveStates, setValveStates] = useState([false, false, false]);
   const [currentImage, setCurrentImage] = useState('/pipe_leakage/pipe_default.png');
   const [error, setError] = useState<string | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   // Check connection status periodically
   useEffect(() => {
@@ -73,6 +74,28 @@ export default function PipelineControl() {
     }
   };
 
+  const handleDisconnect = async () => {
+    setError(null);
+    setIsDisconnecting(true);
+    try {
+      const response = await fetch('/api/pipeline/disconnect', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        setIsConnected(false);
+        setCurrentImage('/pipe_leakage/pipe_default.png');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to disconnect from Raspberry Pi');
+      }
+    } catch (error) {
+      setError('Failed to disconnect from Raspberry Pi');
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   const toggleValve = async (index: number) => {
     if (!isConnected) return;
     setError(null);
@@ -101,36 +124,51 @@ export default function PipelineControl() {
         }),
       });
 
-      if (!response.ok) {
-        // If the server request failed, revert the UI state
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valveStates) {
+          // Update states from server response
+          setValveStates(data.valveStates);
+          // Update image based on server-confirmed valve states
+          const openValveIndex = data.valveStates.findIndex((state: boolean) => state);
+          if (openValveIndex !== -1) {
+            setCurrentImage(`/pipe_leakage/pipe_leak_${openValveIndex + 1}.png`);
+          } else {
+            setCurrentImage('/pipe_leakage/pipe_default.png');
+          }
+        }
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to toggle valve');
+        // Revert the state if the request failed
         const revertStates = [...valveStates];
         revertStates[index] = !newStates[index];
         setValveStates(revertStates);
-        
-        // Revert the image
-        if (revertStates[index]) {
-          setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-        } else {
-          setCurrentImage('/pipe_leakage/pipe_default.png');
+        // Revert image if needed
+        if (!revertStates[index]) {
+          const otherValveOpen = revertStates.findIndex((state: boolean) => state);
+          if (otherValveOpen !== -1) {
+            setCurrentImage(`/pipe_leakage/pipe_leak_${otherValveOpen + 1}.png`);
+          } else {
+            setCurrentImage('/pipe_leakage/pipe_default.png');
+          }
         }
-
-        const data = await response.json();
-        setError(data.error || 'Failed to toggle valve');
       }
     } catch (error) {
-      // If the request failed, revert the UI state
+      setError('Failed to toggle valve');
+      // Revert the state if the request failed
       const revertStates = [...valveStates];
       revertStates[index] = !newStates[index];
       setValveStates(revertStates);
-      
-      // Revert the image
-      if (revertStates[index]) {
-        setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-      } else {
-        setCurrentImage('/pipe_leakage/pipe_default.png');
+      // Revert image if needed
+      if (!revertStates[index]) {
+        const otherValveOpen = revertStates.findIndex((state: boolean) => state);
+        if (otherValveOpen !== -1) {
+          setCurrentImage(`/pipe_leakage/pipe_leak_${otherValveOpen + 1}.png`);
+        } else {
+          setCurrentImage('/pipe_leakage/pipe_default.png');
+        }
       }
-
-      setError('Failed to toggle valve');
     }
   };
 
@@ -154,12 +192,22 @@ export default function PipelineControl() {
                 disabled={isConnected}
               />
             </div>
-            <Button 
-              onClick={handleConnect}
-              disabled={!piIp || isConnected}
-            >
-              {isConnected ? 'Connected' : 'Connect'}
-            </Button>
+            {isConnected ? (
+              <Button 
+                onClick={handleDisconnect} 
+                disabled={isDisconnecting}
+                variant="destructive"
+              >
+                {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleConnect} 
+                disabled={!piIp || isConnected}
+              >
+                Connect
+              </Button>
+            )}
           </div>
           {error && (
             <p className="mt-2 text-sm text-red-500">{error}</p>
@@ -198,4 +246,4 @@ export default function PipelineControl() {
       </Card>
     </div>
   );
-} 
+}
