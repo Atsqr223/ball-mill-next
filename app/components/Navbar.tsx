@@ -1,14 +1,21 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { locations } from '@/lib/locations';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const currentLocation = locations.find(loc => 
     pathname.includes(`/locations/${loc.id}`)
   );
+
+  const toggleDropdown = () => setIsDropdownOpen(prev => !prev);
+  const closeDropdown = () => setIsDropdownOpen(false);
 
   return (
     <nav className="bg-white shadow-lg">
@@ -34,8 +41,12 @@ export default function Navbar() {
             >
               Pipeline
             </Link>
-            <div className="relative group">
-              <button className="flex items-center space-x-1 px-4 py-2 text-gray-700 hover:text-blue-500 transition-colors">
+
+            <div className="relative">
+              <button
+                onClick={toggleDropdown}
+                className="flex items-center space-x-1 px-4 py-2 text-gray-700 hover:text-blue-500 transition-colors"
+              >
                 <span>Locations</span>
                 <svg 
                   className="w-4 h-4" 
@@ -51,11 +62,14 @@ export default function Navbar() {
                   />
                 </svg>
               </button>
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
+              <div className={`absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 transition-all duration-200 z-10
+                ${isDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}
+              `}>
                 {locations.map((location) => (
                   <Link
                     key={location.id}
                     href={`/locations/${location.id}`}
+                    onClick={closeDropdown}
                     className={`block px-4 py-2 text-sm ${
                       currentLocation?.id === location.id
                         ? 'bg-blue-50 text-blue-600'
@@ -80,7 +94,10 @@ export default function Navbar() {
 
           {/* Mobile menu button */}
           <div className="md:hidden">
-            <button className="p-2 rounded-md text-gray-700 hover:text-blue-500 focus:outline-none">
+            <button
+              onClick={() => setIsMobileMenuOpen(prev => !prev)}
+              className="p-2 rounded-md text-gray-700 hover:text-blue-500 focus:outline-none"
+            >
               <svg 
                 className="h-6 w-6" 
                 fill="none" 
@@ -100,42 +117,44 @@ export default function Navbar() {
       </div>
 
       {/* Mobile menu */}
-      <div className="md:hidden">
-        <div className="px-2 pt-2 pb-3 space-y-1">
-          <Link
-            href="/pipeline"
-            className={`block px-3 py-2 rounded-md text-base font-medium ${
-              pathname === '/pipeline'
-                ? 'bg-blue-50 text-blue-600'
-                : 'text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            Pipeline
-          </Link>
-          {locations.map((location) => (
+      {isMobileMenuOpen && (
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1">
             <Link
-              key={location.id}
-              href={`/locations/${location.id}`}
+              href="/pipeline"
               className={`block px-3 py-2 rounded-md text-base font-medium ${
-                currentLocation?.id === location.id
+                pathname === '/pipeline'
                   ? 'bg-blue-50 text-blue-600'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span>{location.name}</span>
-                <div 
-                  className={`w-2 h-2 rounded-full ${
-                    location.status === 'active' 
-                      ? 'bg-green-500' 
-                      : 'bg-red-500'
-                  }`} 
-                />
-              </div>
+              Pipeline
             </Link>
-          ))}
+            {locations.map((location) => (
+              <Link
+                key={location.id}
+                href={`/locations/${location.id}`}
+                className={`block px-3 py-2 rounded-md text-base font-medium ${
+                  currentLocation?.id === location.id
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span>{location.name}</span>
+                  <div 
+                    className={`w-2 h-2 rounded-full ${
+                      location.status === 'active' 
+                        ? 'bg-green-500' 
+                        : 'bg-red-500'
+                    }`} 
+                  />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </nav>
   );
-} 
+}
