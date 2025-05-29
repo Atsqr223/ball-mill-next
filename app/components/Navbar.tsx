@@ -26,6 +26,14 @@ export default function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center space-x-4">
+            <Link
+              href="/pipeline"
+              className={`px-4 py-2 text-gray-700 hover:text-blue-500 transition-colors ${
+                pathname === '/pipeline' ? 'text-blue-600' : ''
+              }`}
+            >
+              Pipeline
+            </Link>
             <div className="relative group">
               <button className="flex items-center space-x-1 px-4 py-2 text-gray-700 hover:text-blue-500 transition-colors">
                 <span>Locations</span>
@@ -94,6 +102,16 @@ export default function Navbar() {
       {/* Mobile menu */}
       <div className="md:hidden">
         <div className="px-2 pt-2 pb-3 space-y-1">
+          <Link
+            href="/pipeline"
+            className={`block px-3 py-2 rounded-md text-base font-medium ${
+              pathname === '/pipeline'
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            Pipeline
+          </Link>
           {locations.map((location) => (
             <Link
               key={location.id}
