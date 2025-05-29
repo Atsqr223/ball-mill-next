@@ -22,28 +22,40 @@ export default function PipelineControl() {
 
   // Check connection status periodically
   useEffect(() => {
-    if (!isConnected) return;
+    // if (!isConnected) return;
 
-    // Check pipeline status
-    const checkStatus = async () => {
-      try {
-        const response = await fetch('/api/pipeline/status');
-        if (!response.ok) {
-          setIsConnected(false);
-          setError('Lost connection to server');
-        }
-      } catch (error) {
-        setIsConnected(false);
-        setError('Failed to check connection status');
-      }
-    };
-
+    // // Check pipeline status
+    // const checkStatus = async () => {
+    //   try {
+    //     const response = await fetch('/api/pipeline/status');
+    //     if (!response.ok) {
+    //       setIsConnected(false);
+    //       setError('Lost connection to server');
+    //     }
+    //   } catch (error) {
+    //     setIsConnected(false);
+    //     setError('Failed to check connection status');
+    //   }
+    // };
+    // console.log('checking connection status');
     // Fetch heatmap data
     const fetchHeatmap = async () => {
       try {
-        const response = await fetch('/api/pipeline/heatmap');
+    const response = await fetch(`/api/pipeline/heatmap?ts=${Date.now()}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
+    });
+        // console.log('Fetching heatmap');
         if (response.ok) {
           const data = await response.json();
+          console.log('Heatmap data:', {
+            data: data.heatmap,
+            timestamp: data.timestamp,
+            dimensions: data.dimensions
+          });
           setHeatmapData(data.heatmap);
           setHeatmapError(null);
         } else {
@@ -51,18 +63,19 @@ export default function PipelineControl() {
         }
       } catch (error) {
         setHeatmapError('Error fetching heatmap data');
+        console.error('Heatmap fetch error:', error);
       }
     };
 
     // Set up intervals
-    const statusInterval = setInterval(checkStatus, 5000);
-    const heatmapInterval = setInterval(fetchHeatmap, 50); // Update heatmap every 50ms to match audio server's rate
+    // const statusInterval = setInterval(checkStatus, 5000);
+    const heatmapInterval = setInterval(fetchHeatmap, 1000); // Update heatmap every 50ms to match audio server's rate
 
     return () => {
-      clearInterval(statusInterval);
+      // clearInterval(statusInterval);
       clearInterval(heatmapInterval);
     };
-  }, [isConnected]);
+  }, []);
 
   const handleConnect = async () => {
     setError(null);
@@ -240,6 +253,7 @@ export default function PipelineControl() {
             <p className="mt-2 text-sm text-red-500">{error}</p>
           )}
         </CardContent>
+        
       </Card>
 
       <Card className="mb-6">
@@ -262,6 +276,14 @@ export default function PipelineControl() {
             ))}
           </div>
         </CardContent>
+        <div className="relative aspect-video mb-6">
+        <Image
+          src={currentImage}
+          alt="Pipeline"
+          fill
+          className="object-contain"
+        />
+      </div>
       </Card>
 
       {error && (
@@ -284,7 +306,8 @@ export default function PipelineControl() {
             <HeatMap
               data={heatmapData}
               className={cn(
-                "w-full h-full",
+                // "w-full h-full",
+                "h-full",
                 !heatmapData && "opacity-50"
               )}
             />
@@ -292,14 +315,7 @@ export default function PipelineControl() {
         </CardContent>
       </Card>
 
-      <div className="relative aspect-video mb-6">
-        <Image
-          src={currentImage}
-          alt="Pipeline"
-          fill
-          className="object-contain"
-        />
-      </div>
+
     </div>
   );
 }
