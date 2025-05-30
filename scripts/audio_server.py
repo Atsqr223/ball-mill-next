@@ -205,7 +205,7 @@ def start_threads():
     task, reader = setup_task()
     if task is None or reader is None:
         logger.error("DAQ task or reader could not be initialized.")
-        sys.exit(1)
+        raise RuntimeError("Failed to initialize DAQ hardware. Please ensure NI-DAQmx is installed and hardware is connected.")
 
     threads = [
         threading.Thread(target=acquire_data, daemon=True),
@@ -222,9 +222,14 @@ if __name__ == '__main__':
         start_threads()
         app.run(host='0.0.0.0', port=5001)
 
+    except RuntimeError as e:
+        logger.error(f"Critical error: {str(e)}")
+        sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
-
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        sys.exit(1)
     finally:
         try:
             if task:
