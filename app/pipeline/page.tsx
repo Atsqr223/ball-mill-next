@@ -16,7 +16,8 @@ export default function PipelineControl() {
   const [valveStates, setValveStates] = useState([false, false, false]);
   const [currentImage, setCurrentImage] = useState('/pipe_leakage/pipe_default.png');
   const [heatmapData, setHeatmapData] = useState(null);
-  const [heatmapError, setHeatmapError] = useState(null);
+  const [heatmapError, setHeatmapError] = useState<string | null>(null);
+  const [isAudioServerRunning, setIsAudioServerRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
@@ -41,28 +42,28 @@ export default function PipelineControl() {
     // Fetch heatmap data
     const fetchHeatmap = async () => {
       try {
-    const response = await fetch(`/api/pipeline/heatmap?ts=${Date.now()}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-      }
-    });
-        // console.log('Fetching heatmap');
+        const response = await fetch(`/api/pipeline/heatmap?ts=${Date.now()}`, {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+          }
+        });
         if (response.ok) {
           const data = await response.json();
-          console.log('Heatmap data:', {
-            data: data.heatmap,
-            timestamp: data.timestamp,
-            dimensions: data.dimensions
-          });
           setHeatmapData(data.heatmap);
           setHeatmapError(null);
+          setIsAudioServerRunning(true);
         } else {
-          setHeatmapError('Failed to fetch heatmap data');
+          const errorData = await response.json();
+          setHeatmapError(errorData.error || 'Audio server is not running');
+          setHeatmapData(null);
+          setIsAudioServerRunning(false);
         }
       } catch (error) {
-        setHeatmapError('Error fetching heatmap data');
+        setHeatmapError('Audio server is not running');
+        setHeatmapData(null);
+        setIsAudioServerRunning(false);
         console.error('Heatmap fetch error:', error);
       }
     };
@@ -213,109 +214,184 @@ export default function PipelineControl() {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-6">Pipeline Control</h1>
+    <div className="container mx-auto p-4 max-w-7xl">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">Pipeline Control</h1>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "w-3 h-3 rounded-full",
+            isConnected ? "bg-green-500" : "bg-red-500"
+          )} />
+          <span className="text-sm text-muted-foreground">
+            {isConnected ? "Connected" : "Disconnected"}
+          </span>
+        </div>
+      </div>
       
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Raspberry Pi Connection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="flex-1">
-              <Label htmlFor="piIp">Raspberry Pi IP Address</Label>
-              <Input
-                id="piIp"
-                value={piIp}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPiIp(e.target.value)}
-                placeholder="e.g., 192.168.1.100"
-                disabled={isConnected}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+              </svg>
+              Raspberry Pi Connection
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-4">
+              <div className="flex-1">
+                <Label htmlFor="piIp" className="text-sm font-medium">Raspberry Pi IP Address</Label>
+                <Input
+                  id="piIp"
+                  value={piIp}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPiIp(e.target.value)}
+                  placeholder="e.g., 192.168.1.100"
+                  disabled={isConnected}
+                  className="mt-1"
+                />
+              </div>
+              {isConnected ? (
+                <Button 
+                  onClick={handleDisconnect} 
+                  disabled={isDisconnecting}
+                  variant="destructive"
+                  className="min-w-[120px]"
+                >
+                  {isDisconnecting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Disconnecting...
+                    </>
+                  ) : 'Disconnect'}
+                </Button>
+              ) : (
+                <Button 
+                  onClick={handleConnect} 
+                  disabled={!piIp || isConnected}
+                  className="min-w-[120px]"
+                >
+                  Connect
+                </Button>
+              )}
+            </div>
+            {error && (
+              <p className="mt-2 text-sm text-red-500 flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {error}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Valve Control
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-6">
+              {valveStates.map((state, index) => (
+                <div key={index} className="flex flex-col items-center space-y-3">
+                  <div className={cn(
+                    "w-16 h-16 rounded-full flex items-center justify-center transition-colors",
+                    state ? "bg-green-100" : "bg-gray-100"
+                  )}>
+                    <Switch
+                      id={`valve${index}`}
+                      checked={state}
+                      onCheckedChange={() => toggleValve(index)}
+                      className="scale-125"
+                    />
+                  </div>
+                  <Label htmlFor={`valve${index}`} className="text-sm font-medium">
+                    Valve {index + 1}
+                  </Label>
+                  <span className={cn(
+                    "text-xs px-2 py-1 rounded-full",
+                    state ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                  )}>
+                    {state ? "Open" : "Closed"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Pipeline Visualization
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="relative aspect-video rounded-lg overflow-hidden border">
+              <Image
+                src={currentImage}
+                alt="Pipeline"
+                fill
+                className="object-contain"
               />
             </div>
-            {isConnected ? (
-              <Button 
-                onClick={handleDisconnect} 
-                disabled={isDisconnecting}
-                variant="destructive"
-              >
-                {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-              </Button>
-            ) : (
-              <Button 
-                onClick={handleConnect} 
-                disabled={!piIp || isConnected}
-              >
-                Connect
-              </Button>
-            )}
-          </div>
-          {error && (
-            <p className="mt-2 text-sm text-red-500">{error}</p>
-          )}
-        </CardContent>
-        
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Valve Control</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            {valveStates.map((state, index) => (
-              <div key={index} className="flex flex-col items-center space-y-2">
-                <Switch
-                  id={`valve${index}`}
-                  checked={state}
-                  onCheckedChange={() => toggleValve(index)}
-                />
-                <Label htmlFor={`valve${index}`} className="text-sm">
-                  Valve {index + 1}
-                </Label>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              Acoustics Guided Localization
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {!isAudioServerRunning && (
+              <div className="bg-yellow-50 text-yellow-700 p-4 rounded-md mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                Audio server is not running. Please start the audio server to see the heatmap.
               </div>
-            ))}
-          </div>
-        </CardContent>
-        <div className="relative aspect-video mb-6">
-        <Image
-          src={currentImage}
-          alt="Pipeline"
-          fill
-          className="object-contain"
-        />
-      </div>
-      </Card>
-
-      {error && (
-        <div className="bg-red-50 text-red-500 p-4 rounded-md mb-4">
-          {error}
-        </div>
-      )}
-
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Audio Heatmap</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {heatmapError && (
-            <div className="bg-red-50 text-red-500 p-4 rounded-md mb-4">
-              {heatmapError}
-            </div>
-          )}
-          <div className="relative aspect-video">
-            <HeatMap
-              data={heatmapData}
-              className={cn(
-                // "w-full h-full",
-                "h-full",
-                !heatmapData && "opacity-50"
+            )}
+            {heatmapError && (
+              <div className="bg-red-50 text-red-500 p-4 rounded-md mb-4 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {heatmapError}
+              </div>
+            )}
+            <div className="relative aspect-video rounded-lg overflow-hidden border">
+              {!isAudioServerRunning ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <p className="text-gray-500">Audio server is not running</p>
+                  </div>
+                </div>
+              ) : (
+                <HeatMap
+                  data={heatmapData}
+                  className={cn(
+                    "h-full",
+                    !heatmapData && "opacity-50"
+                  )}
+                />
               )}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
