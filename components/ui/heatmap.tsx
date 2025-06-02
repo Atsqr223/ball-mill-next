@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Line } from 'react-chartjs-2';
@@ -49,6 +49,45 @@ interface HeatMapProps {
 export function HeatMap({ data, className }: HeatMapProps) {
   const [selectedPixels, setSelectedPixels] = useState<SelectedPixel[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Update audio data for selected pixels
+  useEffect(() => {
+    if (selectedPixels.length === 0) return;
+
+    const updateAudioData = async () => {
+      try {
+        const updatedPixels = await Promise.all(
+          selectedPixels.map(async (pixel) => {
+            const response = await fetch('/api/pipeline/playback/select', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ x: pixel.x, y: pixel.y }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to update audio data');
+            }
+
+            const data = await response.json();
+            return {
+              ...pixel,
+              audioData: data.audio_data,
+            };
+          })
+        );
+
+        setSelectedPixels(updatedPixels);
+      } catch (err) {
+        console.error('Error updating audio data:', err);
+      }
+    };
+
+    // Update every 100ms
+    const interval = setInterval(updateAudioData, 100);
+    return () => clearInterval(interval);
+  }, [selectedPixels]);
 
   if (!data) return null;
 
@@ -232,6 +271,9 @@ export function HeatMap({ data, className }: HeatMapProps) {
                     options={{
                       responsive: true,
                       maintainAspectRatio: false,
+                      animation: {
+                        duration: 0, // Disable animation for smoother updates
+                      },
                       plugins: {
                         legend: {
                           display: false,
