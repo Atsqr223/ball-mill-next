@@ -1,5 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { Button } from './button';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
+// Colors for pixel selection
+const PIXEL_COLORS = [
+  'rgb(255, 99, 132)',   // Red
+  'rgb(54, 162, 235)',   // Blue
+  'rgb(255, 206, 86)',   // Yellow
+  'rgb(75, 192, 192)',   // Green
+  'rgb(153, 102, 255)',  // Purple
+  'rgb(255, 159, 64)',   // Orange
+];
+
+interface SelectedPixel {
+  x: number;
+  y: number;
+  color: string;
+  audioData: number[] | null;
+  isPlaying: boolean;
+}
 
 interface HeatMapProps {
   data: number[][] | null;
@@ -7,6 +47,9 @@ interface HeatMapProps {
 }
 
 export function HeatMap({ data, className }: HeatMapProps) {
+  const [selectedPixels, setSelectedPixels] = useState<SelectedPixel[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
   if (!data) return null;
 
   // Flatten the data to compute min and max
@@ -34,24 +77,183 @@ export function HeatMap({ data, className }: HeatMapProps) {
     data.map(row => row[colIndex])
   );
 
+  const handlePixelClick = async (x: number, y: number) => {
+    try {
+      setError(null);
+      
+      // Check if pixel is already selected
+      const existingPixelIndex = selectedPixels.findIndex(p => p.x === x && p.y === y);
+      if (existingPixelIndex !== -1) {
+        // Deselect the pixel
+        const response = await fetch('/api/pipeline/playback/deselect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ x, y }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to deselect pixel');
+        }
+
+        const newPixels = [...selectedPixels];
+        newPixels.splice(existingPixelIndex, 1);
+        setSelectedPixels(newPixels);
+        return;
+      }
+
+      // Select new pixel
+      const response = await fetch('/api/pipeline/playback/select', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ x, y }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to select pixel');
+      }
+
+      const data = await response.json();
+      const colorIndex = selectedPixels.length % PIXEL_COLORS.length;
+      setSelectedPixels([
+        ...selectedPixels,
+        {
+          x,
+          y,
+          color: PIXEL_COLORS[colorIndex],
+          audioData: data.audio_data,
+          isPlaying: false
+        }
+      ]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to select pixel');
+    }
+  };
+
+  const handlePlayback = async (pixelIndex: number) => {
+    try {
+      setError(null);
+      const pixel = selectedPixels[pixelIndex];
+      
+      const response = await fetch('/api/pipeline/playback/play', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ x: pixel.x, y: pixel.y }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to control playback');
+      }
+
+      const data = await response.json();
+      const newPixels = [...selectedPixels];
+      newPixels[pixelIndex] = {
+        ...pixel,
+        isPlaying: data.status === 'playing'
+      };
+      setSelectedPixels(newPixels);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to control playback');
+    }
+  };
+
   return (
-    <div className={cn("relative", className)}>
-      <div className="absolute inset-0 flex flex-col">
+    <div className={cn("flex flex-col gap-4", className)}>
+      <div className="relative">
         {transposedData.map((row, rowIndex) => (
           <div key={rowIndex} className="flex flex-row">
-            {row.map((value, colIndex) => (
-              <div
-                key={colIndex}
-                className="h-4 w-4 border border-gray-300"
-                style={{
-                  backgroundColor: getColor(value),
-                  transition: 'background-color 0.1s ease',
-                }}
-              />
-            ))}
+            {row.map((value, colIndex) => {
+              const selectedPixel = selectedPixels.find(p => p.x === colIndex && p.y === rowIndex);
+              return (
+                <div
+                  key={colIndex}
+                  className={cn(
+                    "h-4 w-4 border border-gray-300 cursor-pointer transition-all",
+                    selectedPixel && "ring-2"
+                  )}
+                  style={{
+                    backgroundColor: getColor(value),
+                    transition: 'background-color 0.1s ease',
+                    borderColor: selectedPixel?.color || 'transparent',
+                  }}
+                  onClick={() => handlePixelClick(colIndex, rowIndex)}
+                />
+              );
+            })}
           </div>
         ))}
       </div>
+
+      {error && (
+        <div className="text-red-500">
+          {error}
+        </div>
+      )}
+
+      {selectedPixels.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {selectedPixels.map((pixel, index) => (
+            <div key={`${pixel.x}-${pixel.y}`} className="bg-white rounded-lg shadow-lg p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold" style={{ color: pixel.color }}>
+                  Pixel ({pixel.x}, {pixel.y})
+                </h3>
+                <Button
+                  onClick={() => handlePlayback(index)}
+                  variant={pixel.isPlaying ? "destructive" : "default"}
+                  style={{ borderColor: pixel.color }}
+                >
+                  {pixel.isPlaying ? "Stop" : "Play"}
+                </Button>
+              </div>
+              
+              {pixel.audioData && (
+                <div className="h-48">
+                  <Line
+                    data={{
+                      labels: Array.from({ length: pixel.audioData.length }, (_, i) => i),
+                      datasets: [
+                        {
+                          label: 'Audio Signal',
+                          data: pixel.audioData,
+                          borderColor: pixel.color,
+                          tension: 0.1,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: false,
+                        },
+                        title: {
+                          display: true,
+                          text: 'Time Series',
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -199,6 +199,24 @@ def get_status():
     })
 
 
+@app.route('/audio_data', methods=['GET'])
+def get_audio_data():
+    """Return the current audio data for playback"""
+    global ch_data_list
+    try:
+        # Convert the current audio data to a list format
+        audio_data = ch_data_list.T.tolist()
+        return jsonify({
+            "audio_data": audio_data,
+            "sampling_rate": SAMPLING_RATE,
+            "channels": CHANNELS,
+            "buffer_size": BUFFER_SIZE
+        })
+    except Exception as e:
+        logger.error(f"Error getting audio data: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
 def start_threads():
     """Start DAQ and processing threads"""
     global task, reader

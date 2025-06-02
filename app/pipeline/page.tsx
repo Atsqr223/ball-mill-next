@@ -380,13 +380,22 @@ export default function PipelineControl() {
                   </div>
                 </div>
               ) : (
-                <HeatMap
-                  data={heatmapData}
-                  className={cn(
-                    "h-full",
-                    !heatmapData && "opacity-50"
+                <div className="relative">
+                  <HeatMap
+                    data={heatmapData}
+                    className={cn(
+                      "h-full",
+                      !heatmapData && "opacity-50"
+                    )}
+                  />
+                  {!heatmapData && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+                      <div className="text-center">
+                        <p className="text-gray-500">Waiting for heatmap data...</p>
+                      </div>
+                    </div>
                   )}
-                />
+                </div>
               )}
             </div>
           </CardContent>
