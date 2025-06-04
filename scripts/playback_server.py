@@ -158,6 +158,9 @@ def get_audio_for_pixel(x, y):
         if np.max(np.abs(filtered_audio)) > 0:
             filtered_audio = filtered_audio / np.max(np.abs(filtered_audio))
         
+        # Replace NaN values with 0
+        filtered_audio = np.nan_to_num(filtered_audio, nan=0.0)
+        
         return filtered_audio
     except Exception as e:
         logger.error(f"Error getting audio for pixel ({x}, {y}): {str(e)}")
@@ -172,6 +175,7 @@ def select_pixel():
         y = data.get('y')
         
         if x is None or y is None:
+            logger.error("Missing coordinates in request")
             return jsonify({'error': 'Missing x or y coordinates'}), 400
             
         # Use known dimensions
@@ -180,18 +184,23 @@ def select_pixel():
             
         # Validate coordinates
         if not (0 <= x < length_intervals and 0 <= y < diameter_intervals):
+            logger.error(f"Invalid coordinates: ({x}, {y})")
             return jsonify({'error': f'Invalid coordinates: ({x}, {y}). Must be within 0-{length_intervals-1} range for x and 0-{diameter_intervals-1} range for y.'}), 400
             
         if not audio_server_ready:
+            logger.error("Audio server not ready")
             return jsonify({'error': 'Audio server is not ready. Please wait a few seconds and try again.'}), 503
             
         if audio_buffer.empty():
+            logger.error("Audio buffer is empty")
             return jsonify({'error': 'Audio buffer is empty. Please wait for data to start flowing.'}), 503
             
         pixel_id = (x, y)
+        logger.info(f"Attempting to get audio for pixel ({x}, {y})")
         audio_data = get_audio_for_pixel(x, y)
         
         if audio_data is None:
+            logger.error(f"Failed to get audio data for pixel ({x}, {y})")
             return jsonify({'error': 'Failed to get audio data for selected pixel. Please try a different pixel.'}), 500
             
         # Store the pixel selection
@@ -200,6 +209,7 @@ def select_pixel():
             'y': y,
             'is_playing': False
         }
+        logger.info(f"Successfully selected pixel ({x}, {y})")
             
         return jsonify({
             'status': 'success',
@@ -207,7 +217,7 @@ def select_pixel():
             'sampling_rate': SAMPLING_RATE
         })
     except Exception as e:
-        logger.error(f"Error selecting pixel: {str(e)}")
+        logger.error(f"Error selecting pixel: {str(e)}", exc_info=True)
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/play', methods=['POST'])
@@ -254,7 +264,7 @@ def play():
 @app.route('/deselect_pixel', methods=['POST'])
 def deselect_pixel():
     """Handle pixel deselection."""
-    global audio_streams
+    global audio_streams, selected_pixels
     
     try:
         data = request.get_json()
@@ -265,21 +275,23 @@ def deselect_pixel():
             return jsonify({'error': 'Missing pixel coordinates'}), 400
             
         pixel_id = (x, y)
-        if pixel_id in selected_pixels:
-            # Stop playback if active
-            if pixel_id in audio_streams and audio_streams[pixel_id]:
+        
+        # Stop and remove audio stream if it exists
+        if pixel_id in audio_streams:
+            if audio_streams[pixel_id]:
                 audio_streams[pixel_id].stop()
                 audio_streams[pixel_id].close()
-                audio_streams[pixel_id] = None
-            
-            # Remove pixel from selection
+            del audio_streams[pixel_id]
+        
+        # Remove pixel from selection
+        if pixel_id in selected_pixels:
             del selected_pixels[pixel_id]
-            if pixel_id in audio_streams:
-                del audio_streams[pixel_id]
-                
+            logger.info(f"Deselected pixel ({x}, {y})")
             return jsonify({'status': 'success'})
         else:
+            logger.warning(f"Attempted to deselect non-selected pixel ({x}, {y})")
             return jsonify({'error': 'Pixel not selected'}), 400
+            
     except Exception as e:
         logger.error(f"Error deselecting pixel: {str(e)}")
         return jsonify({'error': str(e)}), 500

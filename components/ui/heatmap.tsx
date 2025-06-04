@@ -58,6 +58,11 @@ export function HeatMap({ data, className }: HeatMapProps) {
       try {
         const updatedPixels = await Promise.all(
           selectedPixels.map(async (pixel) => {
+            // Only update if the pixel is still selected
+            if (!selectedPixels.some(p => p.x === pixel.x && p.y === pixel.y)) {
+              return pixel;
+            }
+
             const response = await fetch('/api/pipeline/playback/select', {
               method: 'POST',
               headers: {
@@ -78,7 +83,10 @@ export function HeatMap({ data, className }: HeatMapProps) {
           })
         );
 
-        setSelectedPixels(updatedPixels);
+        // Only update state if we still have selected pixels
+        if (selectedPixels.length > 0) {
+          setSelectedPixels(updatedPixels);
+        }
       } catch (err) {
         console.error('Error updating audio data:', err);
       }
@@ -137,9 +145,8 @@ export function HeatMap({ data, className }: HeatMapProps) {
           throw new Error(error.error || 'Failed to deselect pixel');
         }
 
-        const newPixels = [...selectedPixels];
-        newPixels.splice(existingPixelIndex, 1);
-        setSelectedPixels(newPixels);
+        // Remove the pixel from the selected pixels array
+        setSelectedPixels(prevPixels => prevPixels.filter((_, index) => index !== existingPixelIndex));
         return;
       }
 
@@ -158,6 +165,7 @@ export function HeatMap({ data, className }: HeatMapProps) {
         // Handle specific error cases
         if (response.status === 503) {
           // Server not ready or buffer empty - retry after a delay
+          console.log('Server not ready, retrying in 1 second...');
           setTimeout(() => handlePixelClick(x, y), 1000);
           return;
         }
@@ -165,17 +173,25 @@ export function HeatMap({ data, className }: HeatMapProps) {
         throw new Error(data.error || 'Failed to select pixel');
       }
 
-      const colorIndex = selectedPixels.length % PIXEL_COLORS.length;
-      setSelectedPixels([
-        ...selectedPixels,
-        {
-          x,
-          y,
-          color: PIXEL_COLORS[colorIndex],
-          audioData: data.audio_data,
-          isPlaying: false
+      // Add the new pixel to the selected pixels array
+      setSelectedPixels(prevPixels => {
+        // Check if this pixel is already in the array (shouldn't happen, but just in case)
+        if (prevPixels.some(p => p.x === x && p.y === y)) {
+          return prevPixels;
         }
-      ]);
+        
+        const colorIndex = prevPixels.length % PIXEL_COLORS.length;
+        return [
+          ...prevPixels,
+          {
+            x,
+            y,
+            color: PIXEL_COLORS[colorIndex],
+            audioData: data.audio_data,
+            isPlaying: false
+          }
+        ];
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to select pixel';
       setError(errorMessage);
