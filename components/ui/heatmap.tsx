@@ -152,12 +152,19 @@ export function HeatMap({ data, className }: HeatMapProps) {
         body: JSON.stringify({ x, y }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to select pixel');
+        // Handle specific error cases
+        if (response.status === 503) {
+          // Server not ready or buffer empty - retry after a delay
+          setTimeout(() => handlePixelClick(x, y), 1000);
+          return;
+        }
+        // Show the actual error message from the server
+        throw new Error(data.error || 'Failed to select pixel');
       }
 
-      const data = await response.json();
       const colorIndex = selectedPixels.length % PIXEL_COLORS.length;
       setSelectedPixels([
         ...selectedPixels,
@@ -170,7 +177,9 @@ export function HeatMap({ data, className }: HeatMapProps) {
         }
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to select pixel');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to select pixel';
+      setError(errorMessage);
+      console.error('Pixel selection error:', errorMessage);
     }
   };
 

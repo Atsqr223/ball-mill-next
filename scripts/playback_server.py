@@ -174,11 +174,25 @@ def select_pixel():
         if x is None or y is None:
             return jsonify({'error': 'Missing x or y coordinates'}), 400
             
+        # Use known dimensions
+        length_intervals = 50  # Length of the pipe
+        diameter_intervals = 5  # Diameter of the pipe
+            
+        # Validate coordinates
+        if not (0 <= x < length_intervals and 0 <= y < diameter_intervals):
+            return jsonify({'error': f'Invalid coordinates: ({x}, {y}). Must be within 0-{length_intervals-1} range for x and 0-{diameter_intervals-1} range for y.'}), 400
+            
+        if not audio_server_ready:
+            return jsonify({'error': 'Audio server is not ready. Please wait a few seconds and try again.'}), 503
+            
+        if audio_buffer.empty():
+            return jsonify({'error': 'Audio buffer is empty. Please wait for data to start flowing.'}), 503
+            
         pixel_id = (x, y)
         audio_data = get_audio_for_pixel(x, y)
         
         if audio_data is None:
-            return jsonify({'error': 'Failed to get audio data for selected pixel'}), 500
+            return jsonify({'error': 'Failed to get audio data for selected pixel. Please try a different pixel.'}), 500
             
         # Store the pixel selection
         selected_pixels[pixel_id] = {
@@ -194,7 +208,7 @@ def select_pixel():
         })
     except Exception as e:
         logger.error(f"Error selecting pixel: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Server error: {str(e)}'}), 500
 
 @app.route('/play', methods=['POST'])
 def play():

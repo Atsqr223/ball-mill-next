@@ -1,20 +1,25 @@
 import numpy as np
+import requests
 
 def get_angles_from_pixels_pipe(x, y):
     """
     Convert pixel coordinates to angles for spatial filtering in a pipe setup.
     
     Args:
-        x (int): X coordinate in the heatmap (0 to width-1)
-        y (int): Y coordinate in the heatmap (0 to height-1)
+        x (int): X coordinate in the heatmap (0 to 49)
+        y (int): Y coordinate in the heatmap (0 to 4)
         
     Returns:
         tuple: (theta, phi) angles in radians, or None if invalid coordinates
     """
     try:
+        # Use known dimensions
+        length_intervals = 50  # Length of the pipe
+        diameter_intervals = 5  # Diameter of the pipe
+        
         # Convert pixel coordinates to normalized coordinates (-1 to 1)
-        x_norm = (x / 32) * 2 - 1  # Assuming 32x32 heatmap
-        y_norm = (y / 32) * 2 - 1
+        x_norm = (x / length_intervals) * 2 - 1
+        y_norm = (y / diameter_intervals) * 2 - 1
         
         # Ensure coordinates are within valid range
         x_norm = np.clip(x_norm, -1, 1)
