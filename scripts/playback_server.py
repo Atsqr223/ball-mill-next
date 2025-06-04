@@ -29,6 +29,8 @@ CHANNELS = 8  # Number of audio channels
 CHUNK_SIZE = 1024  # Number of samples per chunk
 BUFFER_DURATION = 1.0  # Duration of audio buffer in seconds
 SAMPLING_RATE = 44100  # Sampling rate in Hz
+LPF_CUTOFF = 1000  # Low-pass filter cutoff frequency in Hz
+LPF_ORDER = 4  # Filter order (higher = sharper cutoff)
 
 # Global variables
 audio_buffer = queue.Queue(maxsize=int(SAMPLING_RATE * BUFFER_DURATION / CHUNK_SIZE))
@@ -161,7 +163,20 @@ def get_audio_for_pixel(x, y):
         # Replace NaN values with 0
         filtered_audio = np.nan_to_num(filtered_audio, nan=0.0)
         
-        return filtered_audio
+        # Apply low-pass filter
+        nyquist = SAMPLING_RATE / 2
+        normalized_cutoff = LPF_CUTOFF / nyquist
+        b, a = signal.butter(LPF_ORDER, normalized_cutoff, btype='low')
+        low_pass_audio = signal.filtfilt(b, a, filtered_audio)
+        
+        # Normalize low-pass filtered signal
+        if np.max(np.abs(low_pass_audio)) > 0:
+            low_pass_audio = low_pass_audio / np.max(np.abs(low_pass_audio))
+        
+        return {
+            'raw': filtered_audio.tolist(),
+            'filtered': low_pass_audio.tolist()
+        }
     except Exception as e:
         logger.error(f"Error getting audio for pixel ({x}, {y}): {str(e)}")
         return None
@@ -213,7 +228,7 @@ def select_pixel():
             
         return jsonify({
             'status': 'success',
-            'audio_data': audio_data.tolist(),
+            'audio_data': audio_data,  # This now contains both raw and filtered data
             'sampling_rate': SAMPLING_RATE
         })
     except Exception as e:
@@ -229,6 +244,7 @@ def play():
         data = request.get_json()
         x = data.get('x')
         y = data.get('y')
+        use_filtered = data.get('use_filtered', True)  # Default to filtered audio
         
         if x is None or y is None:
             return jsonify({'error': 'Missing pixel coordinates'}), 400
@@ -256,6 +272,14 @@ def play():
             audio_stream.start()
             audio_streams[pixel_id] = audio_stream
             selected_pixels[pixel_id]['is_playing'] = True
+            
+            # Get initial audio data
+            audio_data = get_audio_for_pixel(x, y)
+            if audio_data is not None:
+                # Use filtered or raw audio based on preference
+                playback_data = audio_data['filtered'] if use_filtered else audio_data['raw']
+                audio_stream.write(np.array(playback_data, dtype=np.float32))
+            
             return jsonify({'status': 'playing'})
     except Exception as e:
         logger.error(f"Error controlling playback: {str(e)}")

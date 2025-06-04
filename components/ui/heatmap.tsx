@@ -37,8 +37,12 @@ interface SelectedPixel {
   x: number;
   y: number;
   color: string;
-  audioData: number[] | null;
+  audioData: {
+    raw: number[];
+    filtered: number[];
+  } | null;
   isPlaying: boolean;
+  windowSize?: number;  // Size of the rolling window
 }
 
 interface HeatMapProps {
@@ -49,6 +53,7 @@ interface HeatMapProps {
 export function HeatMap({ data, className }: HeatMapProps) {
   const [selectedPixels, setSelectedPixels] = useState<SelectedPixel[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const WINDOW_SIZE = 1000;  // Show last 1000 points
 
   // Update audio data for selected pixels
   useEffect(() => {
@@ -79,6 +84,7 @@ export function HeatMap({ data, className }: HeatMapProps) {
             return {
               ...pixel,
               audioData: data.audio_data,
+              windowSize: WINDOW_SIZE
             };
           })
         );
@@ -188,7 +194,8 @@ export function HeatMap({ data, className }: HeatMapProps) {
             y,
             color: PIXEL_COLORS[colorIndex],
             audioData: data.audio_data,
-            isPlaying: false
+            isPlaying: false,
+            windowSize: WINDOW_SIZE
           }
         ];
       });
@@ -209,7 +216,11 @@ export function HeatMap({ data, className }: HeatMapProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ x: pixel.x, y: pixel.y }),
+        body: JSON.stringify({ 
+          x: pixel.x, 
+          y: pixel.y,
+          use_filtered: true  // Use filtered signal for playback
+        }),
       });
 
       if (!response.ok) {
@@ -280,41 +291,59 @@ export function HeatMap({ data, className }: HeatMapProps) {
               </div>
               
               {pixel.audioData && (
-                <div className="h-48">
-                  <Line
-                    data={{
-                      labels: Array.from({ length: pixel.audioData.length }, (_, i) => i),
-                      datasets: [
-                        {
-                          label: 'Audio Signal',
-                          data: pixel.audioData,
-                          borderColor: pixel.color,
-                          tension: 0.1,
+                <div className="space-y-4">
+                  <div className="h-48">
+                    <Line
+                      data={{
+                        labels: Array.from({ length: WINDOW_SIZE }, (_, i) => i),
+                        datasets: [
+                          {
+                            label: 'Raw Signal',
+                            data: pixel.audioData.raw.slice(-WINDOW_SIZE),
+                            borderColor: pixel.color,
+                            tension: 0.1,
+                            borderWidth: 1,
+                            pointRadius: 0,
+                          },
+                          {
+                            label: 'Low-Pass Filtered',
+                            data: pixel.audioData.filtered.slice(-WINDOW_SIZE),
+                            borderColor: 'rgb(0, 0, 0)',
+                            tension: 0.1,
+                            borderWidth: 2,
+                            pointRadius: 0,
+                          }
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        animation: {
+                          duration: 0,
                         },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      animation: {
-                        duration: 0, // Disable animation for smoother updates
-                      },
-                      plugins: {
-                        legend: {
-                          display: false,
+                        plugins: {
+                          legend: {
+                            display: true,
+                            position: 'top',
+                          },
+                          title: {
+                            display: true,
+                            text: 'Time Series (Rolling Window)',
+                          },
                         },
-                        title: {
-                          display: true,
-                          text: 'Time Series',
+                        scales: {
+                          y: {
+                            beginAtZero: true,
+                            min: -1,
+                            max: 1,
+                          },
+                          x: {
+                            display: false,  // Hide x-axis labels for cleaner look
+                          }
                         },
-                      },
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                        },
-                      },
-                    }}
-                  />
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </div>
