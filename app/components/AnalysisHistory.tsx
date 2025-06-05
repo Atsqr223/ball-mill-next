@@ -162,7 +162,7 @@ export default function AnalysisHistory({ analyses, locationId }: AnalysisHistor
           return (
             <Link
               key={analysis.session.id}
-              href={`/locations/${locationId}/acquisitions/${analysis.session.id}`}
+              href={`/ball-mill/locations/${locationId}/acquisitions/${analysis.session.id}`}
               className="block"
             >
               <div className="p-4 rounded-lg bg-white border border-gray-200 hover:border-blue-300 transition-colors">
