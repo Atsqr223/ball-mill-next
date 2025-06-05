@@ -1,70 +1,89 @@
 import Link from 'next/link';
-import { locations } from '@/lib/locations';
-import LiveStream from '@/app/components/LiveStream';
+import Image from 'next/image'; // Import Next.js Image component
 
-function SensorStatus({ type, status }: { type: string; status: 'active' | 'inactive' }) {
-  return (
-    <div className="flex items-center space-x-2">
-      <div 
-        className={`w-2 h-2 rounded-full ${
-          status === 'active' ? 'bg-green-500' : 'bg-red-500'
-        }`} 
-      />
-      <span className="text-sm text-gray-600">{type}</span>
-    </div>
-  );
+
+interface SectionCardProps {
+  title: string;
+  description: string;
+  href: string;
+  imageUrl?: string; // Optional image for the card
 }
 
-function LocationCard({ location }: { location: typeof locations[0] }) {
+function SectionCard({ title, description, href, imageUrl }: SectionCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-      <div className="aspect-video">
-        <LiveStream streamId={location.youtubeStreamId} />
-      </div>
-      
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h2 className="text-2xl font-semibold mb-1">{location.name}</h2>
-            <div className="flex items-center">
-              <div 
-                className={`w-3 h-3 rounded-full ${
-                  location.status === 'active' ? 'bg-green-500' : 'bg-red-500'
-                } mr-2`} 
-              />
-              <span className="capitalize text-sm text-gray-600">{location.status}</span>
-            </div>
+    <Link href={href} className="block group">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 ease-in-out h-full flex flex-col">
+        {imageUrl && (
+          <div className="w-full h-48 bg-gray-200 overflow-hidden relative"> {/* Added relative positioning for Image fill */}
+            <Image 
+              src={imageUrl} 
+              alt={title} 
+              layout="fill" // Makes image fill the container
+              objectFit="cover" // Equivalent to object-cover
+              className="group-hover:scale-105 transition-transform duration-300 ease-in-out"
+            />
           </div>
-          <Link 
-            href={`/locations/${location.id}`}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-          >
-            View Details
-          </Link>
-        </div>
-
-        <div className="border-t pt-3">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">Sensors</h3>
-          <div className="grid grid-cols-2 gap-2">
-            {location.sensors.map((sensor) => (
-              <SensorStatus key={sensor.id} type={sensor.type} status={sensor.status} />
-            ))}
+        )}
+        <div className="p-6 flex flex-col flex-grow">
+          <h2 className="text-2xl font-semibold mb-2 text-gray-800">{title}</h2>
+          <p className="text-gray-600 flex-grow">{description}</p>
+          <div className="mt-4">
+            <span className="text-blue-500 group-hover:text-blue-700 font-medium">
+              Go to {title} &rarr;
+            </span>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
+
+const sections = [
+  {
+    title: 'Ball Mill Monitoring',
+    description: 'Monitor various Ball Mill locations, view live streams, and analyze sensor data.',
+    href: '/ball-mill',
+    imageUrl: '/images/ball-mill.jpg' // Corrected path
+  },
+  {
+    title: 'Pipeline Control & Monitoring',
+    description: 'Manage pipeline operations, check for leaks, and monitor sensor readings across different pipeline segments.',
+    href: '/pipeline-monitoring', 
+    imageUrl: '/images/pipeline.jpg' // Assuming pipeline.png
+  },
+  {
+    title: 'PLC Systems',
+    description: 'Oversee Programmable Logic Controllers, view status, and manage configurations. (Coming Soon)',
+    href: '/plc',
+    imageUrl: '/images/plc.jpg' // Assuming plc.svg
+  },
+  {
+    title: 'Something Else',
+    description: 'Future system monitoring and control interface. (Coming Soon)',
+    href: '/something',
+    imageUrl: '/images/something.jpg' // Assuming something.jpg
+  },
+];
 
 export default function Home() {
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-bold mb-8">Ball Mill Monitoring System</h1>
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-        {locations.map((location) => (
-          <LocationCard key={location.id} location={location} />
+    <div className="container mx-auto px-4 py-12">
+      <header className="text-center mb-12">
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-4">Advanced Monitoring Dashboard</h1>
+        <p className="text-xl text-gray-600">Select a system below to view detailed information and controls.</p>
+      </header>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        {sections.map((section) => (
+          <SectionCard
+            key={section.title}
+            title={section.title}
+            description={section.description}
+            href={section.href}
+            imageUrl={section.imageUrl}
+          />
         ))}
       </div>
     </div>
   );
 }
+

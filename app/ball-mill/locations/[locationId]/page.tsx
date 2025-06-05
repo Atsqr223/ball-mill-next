@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
-import { locations } from '@/lib/locations';
+import Link from 'next/link';
+import { locations, Location as LocationType } from '@/lib/locations';
 import { db } from '@/lib/db';
 import { acquisitionSessions, sensorData, sensors } from '@/lib/schema';
 import { eq, desc } from 'drizzle-orm';
@@ -8,7 +9,8 @@ import DataAcquisition from '@/app/components/DataAcquisition';
 import AnalysisHistory from '@/app/components/AnalysisHistory';
 
 async function getLocation(locationId: number) {
-  const location = locations.find(loc => loc.id === locationId);
+  // Ensure we only get ball-mill locations if needed, though finding by ID should be specific enough.
+  const location = locations.find(loc => loc.id === locationId && loc.type === 'ball-mill');
   if (!location) return null;
   return location;
 }
@@ -83,7 +85,7 @@ async function getRecentAnalyses(locationId: number) {
   }
 }
 
-export default async function LocationPage({
+export default async function BallMillLocationPage({
   params,
 }: {
   params: { locationId: string };
@@ -100,7 +102,12 @@ export default async function LocationPage({
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">{location.name}</h1>
+        <div className="flex justify-between items-center mb-2">
+          <h1 className="text-4xl font-bold">{location.name}</h1>
+          <Link href="/ball-mill" className="text-blue-500 hover:text-blue-700">
+            &larr; Back to Ball Mill Locations
+          </Link>
+        </div>
         <div className="flex items-center">
           <div
             className={`w-3 h-3 rounded-full ${
@@ -132,4 +139,4 @@ export default async function LocationPage({
       </div>
     </div>
   );
-} 
+}
