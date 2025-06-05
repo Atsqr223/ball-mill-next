@@ -46,7 +46,7 @@ def get_audio_data():
         response = requests.get('http://localhost:5001/audio_data')
         if response.status_code == 200:
             data = response.json()
-            return data['audio_data'], data['sampling_rate']
+            return np.array(data['audio_data']), data['sampling_rate']
         else:
             logger.error(f"Failed to get audio data: {response.status_code}")
             return None, None
@@ -70,13 +70,12 @@ def acquire_data():
                 retry_count = 0  # Reset retry count on success
                 retry_delay = 1.0  # Reset retry delay
                 
-                # Convert to numpy array and ensure correct shape
-                audio_data = np.array(audio_data)
+                # Ensure correct shape
                 if len(audio_data.shape) == 1:
                     audio_data = audio_data.reshape(-1, 1)
                 
                 # Log audio data shape and stats
-                logger.debug(f"Received audio data: shape={audio_data.shape}, min={np.min(audio_data):.3f}, max={np.max(audio_data):.3f}")
+                logger.info(f"Received audio data: shape={audio_data.shape}, min={np.min(audio_data):.3f}, max={np.max(audio_data):.3f}")
                 
                 # Add to buffer
                 if not audio_buffer.full():
@@ -88,9 +87,11 @@ def acquire_data():
                 # Update audio for all selected pixels
                 for pixel_id, stream in audio_streams.items():
                     if stream and stream.active:
-                        filtered_audio = get_audio_for_pixel(*pixel_id)
-                        if filtered_audio is not None:
-                            stream.write(filtered_audio.astype(np.float32))
+                        audio_data = get_audio_for_pixel(*pixel_id)
+                        if audio_data is not None:
+                            # Use filtered audio for playback
+                            playback_data = np.array(audio_data['filtered'], dtype=np.float32)
+                            stream.write(playback_data)
             else:
                 audio_server_ready = False
                 retry_count += 1
@@ -160,9 +161,6 @@ def get_audio_for_pixel(x, y):
         if np.max(np.abs(filtered_audio)) > 0:
             filtered_audio = filtered_audio / np.max(np.abs(filtered_audio))
         
-        # Replace NaN values with 0
-        filtered_audio = np.nan_to_num(filtered_audio, nan=0.0)
-        
         # Apply low-pass filter
         nyquist = SAMPLING_RATE / 2
         normalized_cutoff = LPF_CUTOFF / nyquist
@@ -190,33 +188,13 @@ def select_pixel():
         y = data.get('y')
         
         if x is None or y is None:
-            logger.error("Missing coordinates in request")
             return jsonify({'error': 'Missing x or y coordinates'}), 400
             
-        # Use known dimensions
-        length_intervals = 50  # Length of the pipe
-        diameter_intervals = 5  # Diameter of the pipe
-            
-        # Validate coordinates
-        if not (0 <= x < length_intervals and 0 <= y < diameter_intervals):
-            logger.error(f"Invalid coordinates: ({x}, {y})")
-            return jsonify({'error': f'Invalid coordinates: ({x}, {y}). Must be within 0-{length_intervals-1} range for x and 0-{diameter_intervals-1} range for y.'}), 400
-            
-        if not audio_server_ready:
-            logger.error("Audio server not ready")
-            return jsonify({'error': 'Audio server is not ready. Please wait a few seconds and try again.'}), 503
-            
-        if audio_buffer.empty():
-            logger.error("Audio buffer is empty")
-            return jsonify({'error': 'Audio buffer is empty. Please wait for data to start flowing.'}), 503
-            
         pixel_id = (x, y)
-        logger.info(f"Attempting to get audio for pixel ({x}, {y})")
         audio_data = get_audio_for_pixel(x, y)
         
         if audio_data is None:
-            logger.error(f"Failed to get audio data for pixel ({x}, {y})")
-            return jsonify({'error': 'Failed to get audio data for selected pixel. Please try a different pixel.'}), 500
+            return jsonify({'error': 'Failed to get audio data for selected pixel'}), 500
             
         # Store the pixel selection
         selected_pixels[pixel_id] = {
@@ -224,16 +202,15 @@ def select_pixel():
             'y': y,
             'is_playing': False
         }
-        logger.info(f"Successfully selected pixel ({x}, {y})")
             
         return jsonify({
             'status': 'success',
-            'audio_data': audio_data,  # This now contains both raw and filtered data
+            'audio_data': audio_data,  # This contains both raw and filtered data
             'sampling_rate': SAMPLING_RATE
         })
     except Exception as e:
-        logger.error(f"Error selecting pixel: {str(e)}", exc_info=True)
-        return jsonify({'error': f'Server error: {str(e)}'}), 500
+        logger.error(f"Error selecting pixel: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/play', methods=['POST'])
 def play():
@@ -244,7 +221,6 @@ def play():
         data = request.get_json()
         x = data.get('x')
         y = data.get('y')
-        use_filtered = data.get('use_filtered', True)  # Default to filtered audio
         
         if x is None or y is None:
             return jsonify({'error': 'Missing pixel coordinates'}), 400
@@ -276,9 +252,9 @@ def play():
             # Get initial audio data
             audio_data = get_audio_for_pixel(x, y)
             if audio_data is not None:
-                # Use filtered or raw audio based on preference
-                playback_data = audio_data['filtered'] if use_filtered else audio_data['raw']
-                audio_stream.write(np.array(playback_data, dtype=np.float32))
+                # Use filtered audio for playback
+                playback_data = np.array(audio_data['filtered'], dtype=np.float32)
+                audio_stream.write(playback_data)
             
             return jsonify({'status': 'playing'})
     except Exception as e:

@@ -105,8 +105,10 @@ def acquire_data():
                     number_of_samples_per_channel=BUFFER_SIZE
                 )
 
-                # Convert to numpy array
+                # Convert to numpy array and ensure correct shape
                 data = np.array(ch_data_list).T
+                if len(data.shape) == 1:
+                    data = data.reshape(-1, 1)
 
                 # Add to processing queue
                 data_queue.put(data)
@@ -117,16 +119,7 @@ def acquire_data():
 
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received - shutting down")
-        
         return
-
-            # audio_chunk = task.read(number_of_samples_per_channel=CHUNK_SIZE)
-            # audio_chunk = np.array(audio_chunk).T  # shape: (samples, channels)
-
-            # try:
-            #     data_queue.put_nowait(audio_chunk)
-            # except queue.Full:
-            #     logger.warning("Data queue full — dropping audio chunk")
     except Exception as e:
         logger.error(f"Error in acquisition loop: {str(e)}")
         raise
