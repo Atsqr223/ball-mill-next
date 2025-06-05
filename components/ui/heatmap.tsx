@@ -53,7 +53,9 @@ interface HeatMapProps {
 export function HeatMap({ data, className }: HeatMapProps) {
   const [selectedPixels, setSelectedPixels] = useState<SelectedPixel[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const WINDOW_SIZE = 1000;  // Show last 1000 points
+  const WINDOW_SIZE = 1000;  // Show 1000 points in the window
+  // Add scroll positions for each selected pixel
+  const [scrollPositions, setScrollPositions] = useState<{ [key: string]: number }>({});
 
   // Update audio data for selected pixels
   useEffect(() => {
@@ -101,6 +103,26 @@ export function HeatMap({ data, className }: HeatMapProps) {
     // Update every 100ms
     const interval = setInterval(updateAudioData, 100);
     return () => clearInterval(interval);
+  }, [selectedPixels]);
+
+  // Update scroll positions if new pixels are added
+  useEffect(() => {
+    setScrollPositions((prev) => {
+      const updated = { ...prev };
+      selectedPixels.forEach((pixel) => {
+        const key = `${pixel.x},${pixel.y}`;
+        if (!(key in updated)) {
+          updated[key] = 0; // Start at the beginning
+        }
+      });
+      // Remove scroll positions for deselected pixels
+      Object.keys(updated).forEach((key) => {
+        if (!selectedPixels.some(p => `${p.x},${p.y}` === key)) {
+          delete updated[key];
+        }
+      });
+      return updated;
+    });
   }, [selectedPixels]);
 
   if (!data) return null;
@@ -274,80 +296,106 @@ export function HeatMap({ data, className }: HeatMapProps) {
       )}
 
       {selectedPixels.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {selectedPixels.map((pixel, index) => (
-            <div key={`${pixel.x}-${pixel.y}`} className="bg-white rounded-lg shadow-lg p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold" style={{ color: pixel.color }}>
-                  Pixel ({pixel.x}, {pixel.y})
-                </h3>
-                <Button
-                  onClick={() => handlePlayback(index)}
-                  variant={pixel.isPlaying ? "destructive" : "default"}
-                  style={{ borderColor: pixel.color }}
-                >
-                  {pixel.isPlaying ? "Stop" : "Play"}
-                </Button>
-              </div>
-              
-              {pixel.audioData && (
-                <div className="space-y-4">
-                  <div className="h-48">
-                    <Line
-                      data={{
-                        labels: Array.from({ length: WINDOW_SIZE }, (_, i) => i),
-                        datasets: [
-                          {
-                            label: 'Raw Signal',
-                            data: pixel.audioData.raw.slice(-WINDOW_SIZE),
-                            borderColor: pixel.color,
-                            tension: 0.1,
-                            borderWidth: 1,
-                            pointRadius: 0,
-                          },
-                          {
-                            label: 'Low-Pass Filtered',
-                            data: pixel.audioData.filtered.slice(-WINDOW_SIZE),
-                            borderColor: 'rgb(0, 0, 0)',
-                            tension: 0.1,
-                            borderWidth: 2,
-                            pointRadius: 0,
-                          }
-                        ],
-                      }}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        animation: {
-                          duration: 0,
-                        },
-                        plugins: {
-                          legend: {
-                            display: true,
-                            position: 'top',
-                          },
-                          title: {
-                            display: true,
-                            text: 'Time Series (Rolling Window)',
-                          },
-                        },
-                        scales: {
-                          y: {
-                            beginAtZero: true,
-                            min: -1,
-                            max: 1,
-                          },
-                          x: {
-                            display: false,  // Hide x-axis labels for cleaner look
-                          }
-                        },
-                      }}
-                    />
+        <div className="max-h-[600px] overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {selectedPixels.map((pixel, index) => {
+              const key = `${pixel.x},${pixel.y}`;
+              const audioLength = pixel.audioData ? pixel.audioData.raw.length : 0;
+              const maxScroll = Math.max(0, audioLength - WINDOW_SIZE);
+              const scroll = scrollPositions[key] || 0;
+              // Clamp scroll
+              const clampedScroll = Math.max(0, Math.min(scroll, maxScroll));
+              return (
+                <div key={key} className="bg-white rounded-lg shadow-lg p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold" style={{ color: pixel.color }}>
+                      Pixel ({pixel.x}, {pixel.y})
+                    </h3>
+                    <Button
+                      onClick={() => handlePlayback(index)}
+                      variant={pixel.isPlaying ? "destructive" : "default"}
+                      style={{ borderColor: pixel.color }}
+                    >
+                      {pixel.isPlaying ? "Stop" : "Play"}
+                    </Button>
                   </div>
+                  {pixel.audioData && (
+                    <div className="space-y-4">
+                      <div className="h-48">
+                        <Line
+                          data={{
+                            labels: Array.from({ length: WINDOW_SIZE }, (_, i) => i + clampedScroll),
+                            datasets: [
+                              {
+                                label: 'Raw Signal',
+                                data: pixel.audioData.raw.slice(clampedScroll, clampedScroll + WINDOW_SIZE),
+                                borderColor: pixel.color,
+                                tension: 0.1,
+                                borderWidth: 1,
+                                pointRadius: 0,
+                              },
+                              {
+                                label: 'Low-Pass Filtered',
+                                data: pixel.audioData.filtered.slice(clampedScroll, clampedScroll + WINDOW_SIZE),
+                                borderColor: 'rgb(0, 0, 0)',
+                                tension: 0.1,
+                                borderWidth: 2,
+                                pointRadius: 0,
+                              }
+                            ],
+                          }}
+                          options={{
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            animation: {
+                              duration: 0,
+                            },
+                            plugins: {
+                              legend: {
+                                display: true,
+                                position: 'top',
+                              },
+                              title: {
+                                display: true,
+                                text: 'Time Series (Scrollable Window)',
+                              },
+                            },
+                            scales: {
+                              y: {
+                                beginAtZero: true,
+                                min: -1,
+                                max: 1,
+                              },
+                              x: {
+                                display: false,
+                              }
+                            },
+                          }}
+                        />
+                      </div>
+                      {/* Slider for scrolling */}
+                      {audioLength > WINDOW_SIZE && (
+                        <input
+                          type="range"
+                          min={0}
+                          max={maxScroll}
+                          value={clampedScroll}
+                          onChange={e => {
+                            const newScroll = parseInt(e.target.value, 10);
+                            setScrollPositions(pos => ({ ...pos, [key]: newScroll }));
+                          }}
+                          className="w-full mt-2"
+                        />
+                      )}
+                      <div className="text-xs text-gray-500 text-right">
+                        Showing samples {clampedScroll + 1} - {Math.min(clampedScroll + WINDOW_SIZE, audioLength)} of {audioLength}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
