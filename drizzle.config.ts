@@ -5,10 +5,11 @@ dotenv.config();
 export default {
   schema: './lib/schema.ts',
   out: './drizzle',
-  driver: 'pg',
+  driver: 'aws-data-api',
+  dialect: 'postgresql',
   dbCredentials: {
     connectionString: process.env.DATABASE_URL!,
   },
   verbose: true,
   strict: true,
-} satisfies Config; 
+} as Config; 

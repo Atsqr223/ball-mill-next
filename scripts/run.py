@@ -6,7 +6,8 @@ commands = [
     "npm run dev",
     "python scripts/pipeline_server.py",
     "python scripts/audio_server.py",
-    "python scripts/playback_server.py"
+    "python scripts/playback_server.py",
+    "python scripts/Siemens_PLC_IO_API.py"
 ]
 
 # Store subprocesses

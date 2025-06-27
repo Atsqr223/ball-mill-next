@@ -1,9 +1,9 @@
 'use client'; // Keep 'use client' if PipelineControl needs it, or manage state accordingly
 
 import Link from 'next/link';
-import { useParams, notFound } from 'next/navigation'; // Import useParams
+import { useParams } from 'next/navigation';
 import { locations, Location as LocationType } from '@/lib/locations';
-import PipelineControl from '../../../pipeline/page'; // Corrected path to the original PipelineControl
+import PipelineControl from '../../../pipeline/page';
 import { useEffect, useState } from 'react';
 
 export default function PipelineLocationPage() {
@@ -49,7 +49,7 @@ export default function PipelineLocationPage() {
         </div>
         {/* You can add other location-specific details here if needed */}
       </div>
-      {/* Render the existing PipelineControl component */}
+      {/* All original pipeline controls and logic */}
       <PipelineControl />
     </div>
   );

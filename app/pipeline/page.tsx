@@ -20,6 +20,19 @@ export default function PipelineControl() {
   const [isAudioServerRunning, setIsAudioServerRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [plcOutput, setPlcOutput] = useState(false);
+  const [plcLoading, setPlcLoading] = useState(false);
+  const [plcError, setPlcError] = useState<string | null>(null);
+  const [pipeOverlayScale, setPipeOverlayScale] = useState(1.0); // Example: 1.0 = 100%
+  const [pipeOverlayTranslate, setPipeOverlayTranslate] = useState({ x: 0, y: 0 }); // Example: { x: 0, y: 0 }
+  const [heatmapTranslate, setHeatmapTranslate] = useState({ x: 0, y: 0 }); // Example: { x: 0, y: 0 }
+
+  // Example: set initial values for testing
+  useEffect(() => {
+    setPipeOverlayScale(0.77);
+    setPipeOverlayTranslate({ x: -210, y: -150 });
+    setHeatmapTranslate({ x: 30, y: 182 });
+  }, []);
 
   // Check connection status periodically
   useEffect(() => {
@@ -213,6 +226,28 @@ export default function PipelineControl() {
     }
   };
 
+  const handlePlcToggle = async () => {
+    setPlcLoading(true);
+    setPlcError(null);
+    try {
+      const response = await fetch('/api/pipeline/plc-io', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: !plcOutput }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setPlcOutput(!plcOutput);
+      } else {
+        setPlcError(data.error || 'Failed to set PLC output');
+      }
+    } catch (error: any) {
+      setPlcError(error.message || 'Failed to set PLC output');
+    } finally {
+      setPlcLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-7xl">
       <div className="flex items-center justify-between mb-8">
@@ -246,7 +281,7 @@ export default function PipelineControl() {
                   id="piIp"
                   value={piIp}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPiIp(e.target.value)}
-                  placeholder="e.g., 192.168.1.100"
+                  placeholder="e.g., 192.168.1.100 or 10.135.1.1"
                   disabled={isConnected}
                   className="mt-1"
                 />
@@ -324,6 +359,20 @@ export default function PipelineControl() {
                 </div>
               ))}
             </div>
+            {/* PLC Output Button */}
+            <div className="flex flex-col items-center mt-8">
+              <Button
+                onClick={handlePlcToggle}
+                disabled={plcLoading}
+                variant={plcOutput ? 'default' : 'outline'}
+                className="min-w-[180px]"
+              >
+                {plcLoading ? 'Switching...' : `Compressor: ${plcOutput ? 'ON' : 'OFF'}`}
+              </Button>
+              {plcError && (
+                <p className="mt-2 text-sm text-red-500">{plcError}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -335,12 +384,15 @@ export default function PipelineControl() {
           </CardHeader>
           <CardContent>
             <div className="relative aspect-video rounded-lg overflow-hidden border">
-              <Image
-                src={currentImage}
-                alt="Pipeline"
-                fill
-                className="object-contain"
-              />
+              {/* YouTube Live Video */}
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src="https://www.youtube.com/embed/YOUR_LIVE_VIDEO_ID?autoplay=1"
+                title="YouTube Live Stream"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
             </div>
           </CardContent>
         </Card>
@@ -373,30 +425,38 @@ export default function PipelineControl() {
               </div>
             )}
             <div className="relative aspect-video rounded-lg overflow-hidden border">
-              {!isAudioServerRunning ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                  <div className="text-center">
-                    <p className="text-gray-500">Audio server is not running</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="relative">
-                  <HeatMap
-                    data={heatmapData}
-                    className={cn(
-                      "h-full",
-                      !heatmapData && "opacity-50"
-                    )}
-                  />
-                  {!heatmapData && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-                      <div className="text-center">
-                        <p className="text-gray-500">Waiting for heatmap data...</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Heatmap below, with adjustable translation */}
+              <div
+                className="w-full h-full absolute top-0 left-0 z-10"
+                style={{
+                  transform: `translate(${heatmapTranslate.x}px, ${heatmapTranslate.y}px)`
+                }}
+              >
+                <HeatMap
+                  data={heatmapData}
+                  className="w-full h-full"
+                />
+              </div>
+              {/* Pipe image overlay with adjustable transform */}
+              <div
+                className="w-full h-full absolute top-0 left-0 z-20 pointer-events-none"
+                style={{
+                  transform: `scale(${pipeOverlayScale}) translate(${pipeOverlayTranslate.x}px, ${pipeOverlayTranslate.y}px)`,
+                  mixBlendMode: 'multiply',
+                }}
+              >
+                <Image
+                  src={currentImage}
+                  alt="Pipeline"
+                  fill
+                  className="object-contain opacity-40"
+                />
+              </div>
+              {/*
+                To adjust the pipe overlay alignment, change the values of pipeOverlayScale and pipeOverlayTranslate above.
+                To adjust the heatmap position, change heatmapTranslate.
+                Example: setPipeOverlayScale(0.7); setPipeOverlayTranslate({ x: 50, y: 30 }); setHeatmapTranslate({ x: 20, y: 10 });
+              */}
             </div>
           </CardContent>
         </Card>
