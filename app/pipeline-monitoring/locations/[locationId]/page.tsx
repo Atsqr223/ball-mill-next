@@ -50,7 +50,7 @@ export default function PipelineLocationPage() {
         {/* You can add other location-specific details here if needed */}
       </div>
       {/* All original pipeline controls and logic */}
-      <PipelineControl />
+      <PipelineControl youtubeStreamId={location.youtubeStreamId} />
     </div>
   );
 }

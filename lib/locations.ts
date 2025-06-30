@@ -60,7 +60,7 @@ export const locations: Location[] = [
   {
     id: 4,
     name: 'TCSRI - Pipeline',
-    youtubeStreamId: 'jfKfPfyJRdk', // Sample YouTube live stream, update as needed
+    youtubeStreamId: 'ljv90yjlvYg', // Sample YouTube live stream, update as needed
     status: 'active',
     sensors: [
       { id: 13, type: 'Radar', name: 'Pipeline Radar 1', status: 'active' },

@@ -10,7 +10,11 @@ import Image from 'next/image';
 import { HeatMap } from '@/components/ui/heatmap';
 import { cn } from '@/lib/utils';
 
-export default function PipelineControl() {
+export interface PipelineControlProps {
+  youtubeStreamId?: string;
+}
+
+export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: PipelineControlProps) {
   const [piIp, setPiIp] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [valveStates, setValveStates] = useState([false, false, false]);
@@ -387,7 +391,7 @@ export default function PipelineControl() {
               {/* YouTube Live Video */}
               <iframe
                 className="absolute inset-0 w-full h-full"
-                src="https://www.youtube.com/embed/YOUR_LIVE_VIDEO_ID?autoplay=1"
+                src={`https://www.youtube.com/embed/${youtubeStreamId}?autoplay=1`}
                 title="YouTube Live Stream"
                 frameBorder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
