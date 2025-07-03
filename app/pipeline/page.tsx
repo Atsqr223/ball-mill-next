@@ -95,6 +95,22 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
     };
   }, []);
 
+  // Update image whenever valveStates changes
+  useEffect(() => {
+    setCurrentImage(getPipeLeakImage(valveStates));
+  }, [valveStates]);
+
+  // Helper function to map valveStates to the correct image
+  function getPipeLeakImage(valveStates: boolean[]) {
+    const open = valveStates
+      .map((state, idx) => (state ? (idx + 1).toString() : ''))
+      .filter(Boolean)
+      .join('');
+    if (!open) return '/pipe_leakage/pipe_default.png';
+    if (open.length === 1) return `/pipe_leakage/pipe_leak_${open}.png`;
+    return `/pipe_leakage/pipe_leak_${open.split('').sort().join('')}.png`;
+  }
+
   const handleConnect = async () => {
     setError(null);
     try {
@@ -114,13 +130,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
           const data = await statusResponse.json();
           if (data.valveStates) {
             setValveStates(data.valveStates);
-            // Update image based on valve states
-            const openValveIndex = data.valveStates.findIndex((state: boolean) => state);
-            if (openValveIndex !== -1) {
-              setCurrentImage(`/pipe_leakage/pipe_leak_${openValveIndex + 1}.png`);
-            } else {
-              setCurrentImage('/pipe_leakage/pipe_default.png');
-            }
+            // No need to setCurrentImage here, useEffect will handle it
           }
         }
       } else {
@@ -142,7 +152,8 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
 
       if (response.ok) {
         setIsConnected(false);
-        setCurrentImage('/pipe_leakage/pipe_default.png');
+        setValveStates([false, false, false]); // Reset all valves
+        // No need to setCurrentImage here, useEffect will handle it
       } else {
         const data = await response.json();
         setError(data.error || 'Failed to disconnect from Raspberry Pi');
@@ -162,13 +173,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
     const newStates = [...valveStates];
     newStates[index] = !valveStates[index];
     setValveStates(newStates);
-    
-    // Update image based on valve state
-    if (newStates[index]) {
-      setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
-    } else {
-      setCurrentImage('/pipe_leakage/pipe_default.png');
-    }
+    // No need to setCurrentImage here, useEffect will handle it
 
     try {
       const response = await fetch('/api/pipeline/valve', {
@@ -185,15 +190,8 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
       if (response.ok) {
         const data = await response.json();
         if (data.valveStates) {
-          // Update states from server response
           setValveStates(data.valveStates);
-          // Update image based on server-confirmed valve states
-          const openValveIndex = data.valveStates.findIndex((state: boolean) => state);
-          if (openValveIndex !== -1) {
-            setCurrentImage(`/pipe_leakage/pipe_leak_${openValveIndex + 1}.png`);
-          } else {
-            setCurrentImage('/pipe_leakage/pipe_default.png');
-          }
+          // No need to setCurrentImage here, useEffect will handle it
         }
       } else {
         const data = await response.json();
@@ -202,15 +200,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
         const revertStates = [...valveStates];
         revertStates[index] = !newStates[index];
         setValveStates(revertStates);
-        // Revert image if needed
-        if (!revertStates[index]) {
-          const otherValveOpen = revertStates.findIndex((state: boolean) => state);
-          if (otherValveOpen !== -1) {
-            setCurrentImage(`/pipe_leakage/pipe_leak_${otherValveOpen + 1}.png`);
-          } else {
-            setCurrentImage('/pipe_leakage/pipe_default.png');
-          }
-        }
+        // No need to setCurrentImage here, useEffect will handle it
       }
     } catch (error) {
       setError('Failed to toggle valve');
@@ -218,15 +208,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
       const revertStates = [...valveStates];
       revertStates[index] = !newStates[index];
       setValveStates(revertStates);
-      // Revert image if needed
-      if (!revertStates[index]) {
-        const otherValveOpen = revertStates.findIndex((state: boolean) => state);
-        if (otherValveOpen !== -1) {
-          setCurrentImage(`/pipe_leakage/pipe_leak_${otherValveOpen + 1}.png`);
-        } else {
-          setCurrentImage('/pipe_leakage/pipe_default.png');
-        }
-      }
+      // No need to setCurrentImage here, useEffect will handle it
     }
   };
 
