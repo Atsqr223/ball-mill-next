@@ -352,7 +352,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
                     />
                   </div>
                   <Label htmlFor={`valve${index}`} className="text-sm font-medium">
-                    Valve {index + 1}
+                    {['Left', 'Center', 'Right'][index]}
                   </Label>
                   <span className={cn(
                     "text-xs px-2 py-1 rounded-full",
