@@ -166,14 +166,20 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
   };
 
   const toggleValve = async (index: number) => {
-    if (!isConnected) return;
+    // Allow toggling regardless of isConnected
     setError(null);
 
     // Update UI immediately for better responsiveness
     const newStates = [...valveStates];
     newStates[index] = !valveStates[index];
     setValveStates(newStates);
-    // No need to setCurrentImage here, useEffect will handle it
+    
+    // Update image based on valve state
+    if (newStates[index]) {
+      setCurrentImage(`/pipe_leakage/pipe_leak_${index + 1}.png`);
+    } else {
+      setCurrentImage('/pipe_leakage/pipe_default.png');
+    }
 
     try {
       const response = await fetch('/api/pipeline/valve', {
@@ -190,25 +196,30 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
       if (response.ok) {
         const data = await response.json();
         if (data.valveStates) {
+          // Update states from server response
           setValveStates(data.valveStates);
-          // No need to setCurrentImage here, useEffect will handle it
+          // Update image based on server-confirmed valve states
+          const openValveIndex = data.valveStates.findIndex((state: boolean) => state);
+          if (openValveIndex !== -1) {
+            setCurrentImage(`/pipe_leakage/pipe_leak_${openValveIndex + 1}.png`);
+          } else {
+            setCurrentImage('/pipe_leakage/pipe_default.png');
+          }
         }
       } else {
         const data = await response.json();
         setError(data.error || 'Failed to toggle valve');
-        // Revert the state if the request failed
-        const revertStates = [...valveStates];
-        revertStates[index] = !newStates[index];
-        setValveStates(revertStates);
-        // No need to setCurrentImage here, useEffect will handle it
+        // Optionally, revert the UI state if backend fails
+        // const revertStates = [...valveStates];
+        // revertStates[index] = !newStates[index];
+        // setValveStates(revertStates);
       }
     } catch (error) {
       setError('Failed to toggle valve');
-      // Revert the state if the request failed
-      const revertStates = [...valveStates];
-      revertStates[index] = !newStates[index];
-      setValveStates(revertStates);
-      // No need to setCurrentImage here, useEffect will handle it
+      // Optionally, revert the UI state if backend fails
+      // const revertStates = [...valveStates];
+      // revertStates[index] = !newStates[index];
+      // setValveStates(revertStates);
     }
   };
 

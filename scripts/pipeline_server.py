@@ -121,65 +121,66 @@ def connect():
 @app.route('/valve', methods=['POST'])
 def control_valve():
     try:
-        if not is_connected or not valves:
-            logger.error("Not connected to Raspberry Pi")
-            return jsonify({'error': 'Not connected to Raspberry Pi'}), 400
-
         data = request.get_json()
         valve_index = data.get('valveIndex')
         state = data.get('state')
-        
+
         if valve_index is None or state is None:
             logger.error("Missing valve index or state")
             return jsonify({'error': 'Valve index and state are required'}), 400
-            
+
         if valve_index < 0 or valve_index >= len(VALVE_PINS):
             logger.error(f"Invalid valve index: {valve_index}")
             return jsonify({'error': 'Invalid valve index'}), 400
-            
-        # Update valve state in memory
+
+        # Always update valve state in memory
         valve_states[valve_index] = state
-            
-        # Control valve with retry logic
-        max_retries = 3
-        retry_delay = 0.1  # seconds
-        
-        for attempt in range(max_retries):
-            try:
-                valve = valves[valve_index]
-                if state:
-                    logger.info(f"Opening valve {valve_index}")
-                    valve.on()
-                else:
-                    logger.info(f"Closing valve {valve_index}")
-                    valve.off()
-                
-                # Verify the valve state
-                time.sleep(retry_delay)  # Give the valve time to respond
-                if valve.is_lit == state:
-                    # Update valve state in memory only after successful physical change
-                    valve_states[valve_index] = state
-                    logger.info(f"Successfully set valve {valve_index} to {state}")
-                    return jsonify({
-                        'success': True,
-                        'valveStates': valve_states
-                    })
-                else:
+
+        if is_connected and valves:
+            # Control valve with retry logic
+            max_retries = 3
+            retry_delay = 0.1  # seconds
+
+            for attempt in range(max_retries):
+                try:
+                    valve = valves[valve_index]
+                    if state:
+                        logger.info(f"Opening valve {valve_index}")
+                        valve.on()
+                    else:
+                        logger.info(f"Closing valve {valve_index}")
+                        valve.off()
+
+                    # Verify the valve state
+                    time.sleep(retry_delay)  # Give the valve time to respond
+                    if valve.is_lit == state:
+                        # Update valve state in memory only after successful physical change
+                        valve_states[valve_index] = state
+                        logger.info(f"Successfully set valve {valve_index} to {state}")
+                        return jsonify({
+                            'success': True,
+                            'valveStates': valve_states
+                        })
+                    else:
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Valve state mismatch, retrying... (attempt {attempt + 1}/{max_retries})")
+                            # Reset the stored state since the physical change failed
+                            valve_states[valve_index] = not state
+                            continue
+                        else:
+                            raise Exception("Failed to set valve state after multiple attempts")
+                except Exception as e:
                     if attempt < max_retries - 1:
-                        logger.warning(f"Valve state mismatch, retrying... (attempt {attempt + 1}/{max_retries})")
-                        # Reset the stored state since the physical change failed
-                        valve_states[valve_index] = not state
+                        logger.warning(f"Valve control error, retrying... (attempt {attempt + 1}/{max_retries}): {str(e)}")
+                        time.sleep(retry_delay)
                         continue
                     else:
-                        raise Exception("Failed to set valve state after multiple attempts")
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logger.warning(f"Valve control error, retrying... (attempt {attempt + 1}/{max_retries}): {str(e)}")
-                    time.sleep(retry_delay)
-                    continue
-                else:
-                    raise e
-                    
+                        raise e
+            # If we reach here, something went wrong
+            return jsonify({'error': 'Failed to set valve state'}), 500
+        else:
+            logger.warning("Valve state updated in memory, but not connected to RPI")
+            return jsonify({'success': True, 'valveStates': valve_states, 'warning': 'Not connected to RPI, state not set on hardware'})
     except Exception as e:
         logger.error(f"Valve control error: {str(e)}")
         return jsonify({'error': str(e)}), 500
