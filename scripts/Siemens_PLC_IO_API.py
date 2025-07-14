@@ -1,4 +1,7 @@
+import os
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+load_dotenv()
 
 #All this has been commented out because we are not using the PLC directly.
 #We are using the Azure VM to control the PLC. 
@@ -9,9 +12,9 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# PLC_IP = '10.135.114.201'
-# RACK = 0
-# SLOT = 1
+# PLC_IP = os.environ.get('PLC_IP', '10.135.114.201')
+# RACK = int(os.environ.get('PLC_RACK', 0))
+# SLOT = int(os.environ.get('PLC_SLOT', 1))
 
 # # Keep the PLC client as a global singleton
 # plc = snap7.client.Client()
@@ -56,4 +59,6 @@ def status():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5010) 
+    host = os.environ.get('PLC_SERVER_HOST', '0.0.0.0')
+    port = int(os.environ.get('PLC_SERVER_PORT', 5010))
+    app.run(host=host, port=port) 

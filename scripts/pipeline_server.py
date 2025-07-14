@@ -6,6 +6,9 @@ from gpiozero.pins.pigpio import PiGPIOPin
 import logging
 import sys
 import time
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -21,7 +24,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Store GPIO pins for each valve
-VALVE_PINS = [22, 27, 17]  # Same pins as in the original script
+VALVE_PINS = [int(pin) for pin in os.environ.get('RPI_VALVE_PINS', '22,27,17').split(',')]
 valves = []
 valve_states = [False, False, False]  # Store valve states
 factory = None
@@ -236,4 +239,6 @@ def disconnect():
 
 if __name__ == '__main__':
     logger.info("Starting pipeline control server...")
-    app.run(host='0.0.0.0', port=5000)
+    host = os.environ.get('PIPELINE_SERVER_HOST', '0.0.0.0')
+    port = int(os.environ.get('PIPELINE_SERVER_PORT', 5000))
+    app.run(host=host, port=port)

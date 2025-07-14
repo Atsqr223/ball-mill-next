@@ -10,6 +10,8 @@ import nidaqmx
 from nidaqmx import stream_readers
 from nidaqmx.constants import TerminalConfiguration
 import scipy.signal as sp
+from dotenv import load_dotenv
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -231,7 +233,9 @@ if __name__ == '__main__':
     try:
         logger.info("Starting audio server...")
         start_threads()
-        app.run(host='0.0.0.0', port=5001)
+        host = os.environ.get('AUDIO_SERVER_HOST', '0.0.0.0')
+        port = int(os.environ.get('AUDIO_SERVER_PORT', 5001))
+        app.run(host=host, port=port)
 
     except RuntimeError as e:
         logger.error(f"Critical error: {str(e)}")

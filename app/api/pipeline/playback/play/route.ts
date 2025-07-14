@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 
+const PLAYBACK_SERVER_HOST = process.env.PLAYBACK_SERVER_HOST || 'localhost';
+const PLAYBACK_SERVER_PORT = process.env.PLAYBACK_SERVER_PORT || '5002';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
 
     // Forward request to playback server
-    const response = await fetch('http://localhost:5002/play', {
+    const response = await fetch(`http://${PLAYBACK_SERVER_HOST}:${PLAYBACK_SERVER_PORT}/play`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

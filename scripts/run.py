@@ -1,5 +1,8 @@
 import subprocess
 import time
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Define the commands to run
 commands = [
@@ -17,7 +20,7 @@ try:
     for cmd in commands:
         print(f"Starting: {cmd}")
         # Use shell=True for Windows compatibility (especially for npm)
-        process = subprocess.Popen(cmd, shell=True)
+        process = subprocess.Popen(cmd, shell=True, env=os.environ.copy())
         processes.append(process)
     
     print("All processes started. Press Ctrl+C to stop.")

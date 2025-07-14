@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 
+const AUDIO_SERVER_HOST = process.env.AUDIO_SERVER_HOST || 'localhost';
+const AUDIO_SERVER_PORT = process.env.AUDIO_SERVER_PORT || '5001';
+
 export async function GET() {
   try {
     // Forward request to audio server
-    const response = await fetch('http://localhost:5001/heatmap');
+    const response = await fetch(`http://${AUDIO_SERVER_HOST}:${AUDIO_SERVER_PORT}/heatmap`);
 
     if (!response.ok) {
       const error = await response.json();

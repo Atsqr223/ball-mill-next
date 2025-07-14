@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify
 import requests
 import sounddevice as sd
 from scipy import signal
+from dotenv import load_dotenv
+load_dotenv()
 
 # Add the parent directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,7 +45,9 @@ audio_streams = {}  # Dictionary to store audio streams for each pixel
 def get_audio_data():
     """Get audio data from the audio server."""
     try:
-        response = requests.get('http://localhost:5001/audio_data')
+        AUDIO_SERVER_HOST = os.environ.get('AUDIO_SERVER_HOST', 'localhost')
+        AUDIO_SERVER_PORT = os.environ.get('AUDIO_SERVER_PORT', '5001')
+        response = requests.get(f'http://{AUDIO_SERVER_HOST}:{AUDIO_SERVER_PORT}/audio_data')
         if response.status_code == 200:
             data = response.json()
             return np.array(data['audio_data']), data['sampling_rate']
@@ -316,7 +320,9 @@ def start_threads():
     acquire_thread.start()
     
     # Start Flask app
-    app.run(host='0.0.0.0', port=5002)
+    host = os.environ.get('PLAYBACK_SERVER_HOST', '0.0.0.0')
+    port = int(os.environ.get('PLAYBACK_SERVER_PORT', 5002))
+    app.run(host=host, port=port)
 
 if __name__ == '__main__':
     try:
