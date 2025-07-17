@@ -26,7 +26,7 @@ export default function PipelineLocationPage() {
 
   // WebSocket connection for real-time pressure
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:8765');
+    const ws = new WebSocket('ws://localhost:65506');
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
