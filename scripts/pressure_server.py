@@ -4,7 +4,7 @@ import random
 import json
 
 HOST = '0.0.0.0'  # Listen on all interfaces
-PORT = 8765        # You can change this port if needed
+PORT = 65506       # You can change this port if needed
 
 async def pressure_sender(websocket):
     while True:
