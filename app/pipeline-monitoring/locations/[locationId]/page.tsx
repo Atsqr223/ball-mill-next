@@ -10,6 +10,7 @@ export default function PipelineLocationPage() {
   const params = useParams();
   const locationIdString = params.locationId as string;
   const [location, setLocation] = useState<LocationType | null>(null);
+  const [pressure, setPressure] = useState<number | null>(null);
 
   useEffect(() => {
     if (locationIdString) {
@@ -24,6 +25,28 @@ export default function PipelineLocationPage() {
       }
     }
   }, [locationIdString]);
+
+  // WebSocket connection for real-time pressure
+  useEffect(() => {
+    const wsUrl = process.env.NEXT_PUBLIC_PRESSURE_WS_URL || 'ws://localhost:65506';
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (typeof data.pressure === 'number') {
+          setPressure(data.pressure);
+        }
+      } catch (e) {
+        // Ignore malformed data
+      }
+    };
+    ws.onerror = () => {
+      // Optionally handle error
+    };
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   if (!locationIdString) {
     // This case should ideally be handled by Next.js routing if the param is missing
@@ -47,10 +70,10 @@ export default function PipelineLocationPage() {
             &larr; Back to Pipeline Locations
           </Link>
         </div>
-        {/* You can add other location-specific details here if needed */}
-      </div>
+        {/* Real-time pressure value display */}
+        </div>
       {/* All original pipeline controls and logic */}
-      <PipelineControl youtubeStreamId={location.youtubeStreamId} />
+      <PipelineControl youtubeStreamId={location.youtubeStreamId} pressure={pressure}   />
     </div>
   );
 }
