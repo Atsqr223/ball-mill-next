@@ -10,6 +10,7 @@ export default function PipelineLocationPage() {
   const params = useParams();
   const locationIdString = params.locationId as string;
   const [location, setLocation] = useState<LocationType | null>(null);
+  const [pressure, setPressure] = useState<number | null>(null);
 
   useEffect(() => {
     if (locationIdString) {
@@ -18,24 +19,38 @@ export default function PipelineLocationPage() {
       if (foundLocation) {
         setLocation(foundLocation);
       } else {
-        // Handle not found outside of useEffect or ensure notFound can be called here
-        // For simplicity, we'll rely on a check before rendering.
         setLocation(null); 
       }
     }
   }, [locationIdString]);
 
+  // WebSocket connection for real-time pressure
+  useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8765');
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (typeof data.pressure === 'number') {
+          setPressure(data.pressure);
+        }
+      } catch (e) {
+        // Ignore malformed data
+      }
+    };
+    ws.onerror = () => {
+      // Optionally handle error
+    };
+    return () => {
+      ws.close();
+    };
+  }, []);
+
   if (!locationIdString) {
-    // This case should ideally be handled by Next.js routing if the param is missing
     return <p>Loading location...</p>; 
   }
 
   if (!location) {
-    // Call notFound() if the component is intended to be a server component initially
-    // or handle as an error/loading state for client components.
-    // For a client component that might initially not have the param, then finds it invalid:
-    // notFound(); // This might need to be called from a Server Component parent or specific Next.js API
-    return <p>Pipeline location not found.</p>; // Fallback for client-side not found
+    return <p>Pipeline location not found.</p>; 
   }
 
   return (
@@ -47,10 +62,10 @@ export default function PipelineLocationPage() {
             &larr; Back to Pipeline Locations
           </Link>
         </div>
-        {/* You can add other location-specific details here if needed */}
+        {/* Real-time pressure value display */}
       </div>
       {/* All original pipeline controls and logic */}
-      <PipelineControl youtubeStreamId={location.youtubeStreamId} />
+      <PipelineControl youtubeStreamId={location.youtubeStreamId} pressure={pressure} />
     </div>
   );
 }

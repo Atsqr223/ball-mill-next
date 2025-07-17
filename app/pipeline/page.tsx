@@ -12,9 +12,10 @@ import { cn } from '@/lib/utils';
 
 export interface PipelineControlProps {
   youtubeStreamId?: string;
+  pressure?: number | null;
 }
 
-export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: PipelineControlProps) {
+export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', pressure }: PipelineControlProps) {
   const [piIp, setPiIp] = useState('');
   const [isConnected, setIsConnected] = useState(false);
   const [valveStates, setValveStates] = useState([false, false, false]);
@@ -358,6 +359,11 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk' }: Pip
               {plcError && (
                 <p className="mt-2 text-sm text-red-500">{plcError}</p>
               )}
+              {/* Pressure value box below compressor button */}
+              <div className="mt-4 p-4 bg-gray-100 rounded shadow w-fit">
+                <span className="font-semibold">Pressure: </span>
+                <span className="text-xl">{pressure !== undefined && pressure !== null ? pressure.toFixed(2) : 'Loading...'}</span>
+              </div>
             </div>
           </CardContent>
         </Card>
