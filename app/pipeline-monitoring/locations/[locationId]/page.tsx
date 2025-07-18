@@ -26,28 +26,26 @@ export default function PipelineLocationPage() {
     }
   }, [locationIdString]);
 
-  // WebSocket connection for real-time pressure
-  useEffect(() => {
-    // Update the URL below to your Azure VM's public IP and port, e.g. ws://YOUR_AZURE_IP:65506
-    const wsUrl = process.env.NEXT_PUBLIC_PRESSURE_WS_URL || 'ws://localhost:65506';
-    const ws = new WebSocket(wsUrl);
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+
+useEffect(() => {
+  const fetchPressure = async () => {
+    try {
+      const PRESSURE_URL = process.env.NEXT_PUBLIC_PRESSURE_HTTP_URL || 'http://localhost:65507/latest_pressure';
+      const res = await fetch(PRESSURE_URL);
+      if (res.ok) {
+        const data = await res.json();
         if (typeof data.pressure === 'number') {
           setPressure(data.pressure);
         }
-      } catch (e) {
-        // Ignore malformed data
       }
-    };
-    ws.onerror = () => {
-      // Optionally handle error
-    };
-    return () => {
-      ws.close();
-    };
-  }, []);
+    } catch (e) {
+      // handle error
+    }
+  };
+  const interval = setInterval(fetchPressure, 1000);
+  return () => clearInterval(interval);
+}, []);
+
 
   if (!locationIdString) {
     // This case should ideally be handled by Next.js routing if the param is missing
@@ -78,3 +76,4 @@ export default function PipelineLocationPage() {
     </div>
   );
 }
+
