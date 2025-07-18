@@ -28,6 +28,7 @@ export default function PipelineLocationPage() {
 
   // WebSocket connection for real-time pressure
   useEffect(() => {
+    // Update the URL below to your Azure VM's public IP and port, e.g. ws://YOUR_AZURE_IP:65506
     const wsUrl = process.env.NEXT_PUBLIC_PRESSURE_WS_URL || 'ws://localhost:65506';
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (event) => {
