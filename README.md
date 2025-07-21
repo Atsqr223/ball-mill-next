@@ -87,3 +87,29 @@ npm run dev
 ## License
 
 MIT
+
+## Remote Control Usage (Azure VM)
+
+You can run the control server on your Azure VM and control it from your local machine using the control client.
+
+### 1. On the Azure VM
+- Start the control server:
+  ```bash
+  python scripts/control_server.py
+  ```
+- Make sure port 65507 is open in your Azure VM's firewall/network security group.
+
+### 2. On Your Local Machine
+- Use the control client and specify the Azure VM's public IP:
+  ```bash
+  python scripts/control_client.py --host http://<azure-vm-ip>:65507 valve 1 on
+  python scripts/control_client.py --host http://<azure-vm-ip>:65507 compressor off
+  python scripts/control_client.py --host http://<azure-vm-ip>:65507 threshold 2.5
+  python scripts/control_client.py --host http://<azure-vm-ip>:65507 status
+  ```
+
+- The `--host` argument lets you point the client to any reachable control server (default is localhost).
+
+### Notes
+- The control server on Azure will interact with the rest of your system as before.
+- You can use the same client script for both local and remote control.
