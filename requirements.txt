@@ -1,1 +1,4 @@
 sounddevice==0.4.6 
+Flask
+requests
+websocket-client 

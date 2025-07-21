@@ -76,6 +76,55 @@ npm run dev
 - `POST /api/acquisition/start` - Start a new data acquisition session
 - `GET /api/acquisition/[id]` - Get acquisition session status and data
 
+## Control Server and Client Usage
+
+### 1. Install Dependencies
+
+From the project root, install Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Start the Control Server
+
+Run the control server (it will listen on port 65507):
+
+```bash
+python scripts/control_server.py
+```
+
+The server will automatically connect to the pressure WebSocket and expose a REST API for control.
+
+### 3. Use the Control Client
+
+You can use the control client to send commands to the server:
+
+```bash
+# Toggle valve 0 ON
+python scripts/control_client.py valve 0 on
+
+# Toggle valve 1 OFF
+python scripts/control_client.py valve 1 off
+
+# Turn compressor ON
+python scripts/control_client.py compressor on
+
+# Turn compressor OFF
+python scripts/control_client.py compressor off
+
+# Set pressure threshold to 2.5 (auto-off compressor when reached)
+python scripts/control_client.py threshold 2.5
+
+# Get current status (pressure, threshold, compressor state)
+python scripts/control_client.py status
+```
+
+### Notes
+- The control server uses the website's API endpoints for all actions.
+- The pressure threshold is configurable at runtime via the client.
+- The server will auto-switch off the compressor when the threshold is reached.
+
 ## Contributing
 
 1. Fork the repository
