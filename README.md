@@ -105,6 +105,7 @@ You can run the control server on your Azure VM and control it from your local m
   python scripts/control_client.py --host http://<azure-vm-ip>:65507 valve 1 on
   python scripts/control_client.py --host http://<azure-vm-ip>:65507 compressor off
   python scripts/control_client.py --host http://<azure-vm-ip>:65507 threshold 2.5
+  python scripts/control_client.py --host http://<azure-vm-ip>:65507 lower-threshold 2.5
   python scripts/control_client.py --host http://<azure-vm-ip>:65507 status
   ```
 

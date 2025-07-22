@@ -26,6 +26,11 @@ def set_pressure_threshold(threshold, base_url):
     resp = requests.post(url, json={'threshold': threshold})
     print(resp.text)
 
+def set_lower_pressure_threshold(threshold, base_url):
+    url = f'{base_url}/lower-pressure-threshold'
+    resp = requests.post(url, json={'threshold': threshold})
+    print(resp.text)
+
 def get_status(base_url):
     url = f'{base_url}/status'
     resp = requests.get(url)
@@ -50,6 +55,10 @@ def main():
     parser_threshold = subparsers.add_parser('threshold', help='Set pressure threshold')
     parser_threshold.add_argument('value', type=float, help='Pressure threshold value')
 
+    # Lower Pressure threshold
+    parser_lower_threshold = subparsers.add_parser('lower-threshold', help='Set lower pressure threshold to turn off all valves')
+    parser_lower_threshold.add_argument('value', type=float, help='Lower pressure threshold value')
+
     # Status
     parser_status = subparsers.add_parser('status', help='Get current status')
 
@@ -62,6 +71,8 @@ def main():
         set_compressor(args.state == 'on', base_url)
     elif args.command == 'threshold':
         set_pressure_threshold(args.value, base_url)
+    elif args.command == 'lower-threshold':
+        set_lower_pressure_threshold(args.value, base_url)
     elif args.command == 'status':
         get_status(base_url)
     else:

@@ -22,13 +22,30 @@ COMPRESSOR_API_URL = f'http://{WEB_HOST}:{WEB_PORT}/api/pipeline/plc-io'
 
 # State
 pressure_threshold = None
+lower_pressure_threshold = None # New lower threshold
 current_pressure = None
 compressor_on = False
 pressure_lock = threading.Lock()
+valve_states = [False, False, False] # Assuming 3 valves, initially OFF
+
+# --- Pressure Monitoring Thread (HTTP Polling) ---
+def turn_off_all_valves():
+    print("[AUTO] Turning off all valves due to low pressure.")
+    for i in range(3):
+        try:
+            # Assuming state=False means OFF
+            r = requests.post(VALVE_API_URL, json={'valveIndex': i, 'state': False})
+            if r.ok:
+                valve_states[i] = False
+                print(f"[AUTO] Valve {i} turned OFF.")
+            else:
+                print(f"[AUTO] Error turning off valve {i}: {r.text}")
+        except Exception as e:
+            print(f"[AUTO] Exception turning off valve {i}: {e}")
 
 # --- Pressure Monitoring Thread (HTTP Polling) ---
 def pressure_poll_thread():
-    global current_pressure, compressor_on, pressure_threshold
+    global current_pressure, compressor_on, pressure_threshold, lower_pressure_threshold
     while True:
         try:
             resp = requests.get(PRESSURE_HTTP_URL, timeout=2)
@@ -51,6 +68,15 @@ def pressure_poll_thread():
                                     print(f"[AUTO] Compressor turned OFF at pressure {pressure}")
                             except Exception as e:
                                 print(f"[AUTO] Error turning off compressor: {e}")
+                        # Auto-switch off all valves if lower threshold is set and reached
+                        if (
+                            lower_pressure_threshold is not None and
+                            pressure <= lower_pressure_threshold
+                        ):
+                            turn_off_all_valves()
+                            # To prevent it from repeatedly triggering, we can clear the threshold
+                            lower_pressure_threshold = None
+                            print(f"[AUTO] Lower pressure threshold event handled and threshold cleared.")
         except Exception as e:
             print(f"[HTTP] Error polling pressure: {e}")
         time.sleep(1)
@@ -59,12 +85,17 @@ def pressure_poll_thread():
 @app.route('/valve', methods=['POST'])
 def control_valve():
     data = request.get_json()
+    global valve_states
     valve_index = data.get('valveIndex')
     state = data.get('state')
     if valve_index is None or state is None:
         return jsonify({'error': 'valveIndex and state required'}), 400
     try:
         resp = requests.post(VALVE_API_URL, json={'valveIndex': valve_index, 'state': state})
+        if resp.ok:
+            # Update our tracked state
+            if 0 <= valve_index < len(valve_states):
+                valve_states[valve_index] = bool(state)
         return jsonify(resp.json()), resp.status_code
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -101,6 +132,23 @@ def set_pressure_threshold():
 def get_pressure_threshold():
     return jsonify({'threshold': pressure_threshold})
 
+@app.route('/lower-pressure-threshold', methods=['POST'])
+def set_lower_pressure_threshold():
+    global lower_pressure_threshold
+    data = request.get_json()
+    threshold = data.get('threshold')
+    if threshold is None:
+        return jsonify({'error': 'threshold required'}), 400
+    try:
+        lower_pressure_threshold = float(threshold)
+        return jsonify({'success': True, 'lower_threshold': lower_pressure_threshold})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@app.route('/lower-pressure-threshold', methods=['GET'])
+def get_lower_pressure_threshold():
+    return jsonify({'lower_threshold': lower_pressure_threshold})
+
 @app.route('/pressure', methods=['GET'])
 def get_pressure():
     with pressure_lock:
@@ -112,7 +160,9 @@ def get_status():
         return jsonify({
             'pressure': current_pressure,
             'threshold': pressure_threshold,
-            'compressor_on': compressor_on
+            'lower_threshold': lower_pressure_threshold,
+            'compressor_on': compressor_on,
+            'valve_states': valve_states
         })
 
 if __name__ == '__main__':
