@@ -73,7 +73,7 @@ def main():
     # Toggle-range mode
     parser_toggle = subparsers.add_parser('toggle-range', help='Control the automatic compress/release cycle')
     parser_toggle.add_argument('state', type=str, choices=['on', 'off'], help='State of the toggle-range mode')
-    parser_toggle.add_argument('--valve', type=int, help='Valve index to use for the cycle (required when turning on)')
+    parser_toggle.add_argument('--valve', type=int, help='Valve index to use for the cycle (optional, random if not specified)')
 
     args = parser.parse_args()
     base_url = args.host.rstrip('/')
@@ -89,9 +89,6 @@ def main():
     elif args.command == 'status':
         get_status(base_url)
     elif args.command == 'toggle-range':
-        if args.state == 'on' and args.valve is None:
-            print('Error: --valve is required when turning on toggle-range mode.')
-            sys.exit(1)
         set_toggle_range(args.state, args.valve, base_url)
     else:
         parser.print_help()

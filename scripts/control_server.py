@@ -3,6 +3,7 @@ import time
 import requests
 import json
 import os
+import random
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -213,7 +214,8 @@ def toggle_range_mode():
     if state == 'on':
         valve_index = data.get('valveIndex')
         if valve_index is None:
-            return jsonify({'error': 'valveIndex required to start toggle-range mode'}), 400
+            valve_index = random.choice([0, 1, 2])
+            print(f"[MODE] No valve specified for toggle-range. Randomly selected valve {valve_index}.")
         if pressure_threshold is None or lower_pressure_threshold is None:
             return jsonify({'error': 'Upper and lower thresholds must be set before starting toggle-range mode'}), 400
         
