@@ -36,6 +36,14 @@ def get_status(base_url):
     resp = requests.get(url)
     print(resp.text)
 
+def set_toggle_range(state, valve_index, base_url):
+    url = f'{base_url}/toggle-range'
+    payload = {'state': state}
+    if valve_index is not None:
+        payload['valveIndex'] = valve_index
+    resp = requests.post(url, json=payload)
+    print(resp.text)
+
 def main():
     parser = argparse.ArgumentParser(description='Control client for valve, compressor, and pressure threshold.')
     parser.add_argument('--host', type=str, default=DEFAULT_CONTROL_SERVER_URL,
@@ -62,6 +70,11 @@ def main():
     # Status
     parser_status = subparsers.add_parser('status', help='Get current status')
 
+    # Toggle-range mode
+    parser_toggle = subparsers.add_parser('toggle-range', help='Control the automatic compress/release cycle')
+    parser_toggle.add_argument('state', type=str, choices=['on', 'off'], help='State of the toggle-range mode')
+    parser_toggle.add_argument('--valve', type=int, help='Valve index to use for the cycle (required when turning on)')
+
     args = parser.parse_args()
     base_url = args.host.rstrip('/')
 
@@ -75,6 +88,11 @@ def main():
         set_lower_pressure_threshold(args.value, base_url)
     elif args.command == 'status':
         get_status(base_url)
+    elif args.command == 'toggle-range':
+        if args.state == 'on' and args.valve is None:
+            print('Error: --valve is required when turning on toggle-range mode.')
+            sys.exit(1)
+        set_toggle_range(args.state, args.valve, base_url)
     else:
         parser.print_help()
         sys.exit(1)
