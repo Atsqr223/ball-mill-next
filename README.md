@@ -102,13 +102,13 @@ You can run the control server on your Azure VM and control it from your local m
 ### 2. On Your Local Machine
 - Use the control client and specify the Azure VM's public IP:
   ```bash
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 valve 1 on
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 compressor off
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 threshold 2.5
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 lower-threshold 2.5
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 status
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 toggle-range on --valve 1
-  python scripts/control_client.py --host http://<azure-vm-ip>:65507 toggle-range off
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 valve 1 on
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 compressor off
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 threshold 2.5
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 lower-threshold 2.5
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 status
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 toggle-range on --valve 1
+  python scripts/control_client.py --host http://<azure-vm-ip>:65508 toggle-range off
   ```
 
 - The `--host` argument lets you point the client to any reachable control server (default is localhost).
