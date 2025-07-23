@@ -8,7 +8,8 @@ commands = [
     "python scripts/audio_server.py",
     "python scripts/playback_server.py",
     "python scripts/Siemens_PLC_IO_API.py",
-    "python scripts/pressure_server.py"
+    "python scripts/pressure_server.py",
+    "python scripts/control_server.py"
 ]
 
 # Store subprocesses
