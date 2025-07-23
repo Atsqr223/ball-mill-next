@@ -19,6 +19,19 @@ def set_pressure_threshold(threshold):
     resp = requests.post(url, json={'threshold': threshold})
     print(resp.text)
 
+def set_lower_pressure_threshold(threshold):
+    url = f'{CONTROL_SERVER_URL}/lower-pressure-threshold'
+    resp = requests.post(url, json={'threshold': threshold})
+    print(resp.text)
+
+def set_toggle_range(state, valve_index):
+    url = f'{CONTROL_SERVER_URL}/toggle-range'
+    payload = {'state': state}
+    if valve_index is not None:
+        payload['valveIndex'] = valve_index
+    resp = requests.post(url, json=payload)
+    print(resp.text)
+
 def get_status():
     url = f'{CONTROL_SERVER_URL}/status'
     resp = requests.get(url)
@@ -30,28 +43,30 @@ def connect_pi(pi_ip):
     print(resp.text)
 
 def main():
-    parser = argparse.ArgumentParser(description='Control client for valve, compressor, and pressure threshold.')
+    parser = argparse.ArgumentParser(description='Control client for pipeline system.')
     subparsers = parser.add_subparsers(dest='command')
 
-    # Valve
     parser_valve = subparsers.add_parser('valve', help='Toggle a valve')
-    parser_valve.add_argument('index', type=int, help='Valve index (0, 1, 2)')
-    parser_valve.add_argument('state', type=str, choices=['on', 'off'], help='Valve state')
+    parser_valve.add_argument('index', type=int)
+    parser_valve.add_argument('state', choices=['on', 'off'])
 
-    # Compressor
     parser_compressor = subparsers.add_parser('compressor', help='Toggle compressor')
-    parser_compressor.add_argument('state', type=str, choices=['on', 'off'], help='Compressor state')
+    parser_compressor.add_argument('state', choices=['on', 'off'])
 
-    # Pressure threshold
     parser_threshold = subparsers.add_parser('threshold', help='Set pressure threshold')
-    parser_threshold.add_argument('value', type=float, help='Pressure threshold value')
+    parser_threshold.add_argument('value', type=float)
 
-    # Status
-    parser_status = subparsers.add_parser('status', help='Get current status')
+    parser_lower = subparsers.add_parser('lower-threshold', help='Set lower pressure threshold')
+    parser_lower.add_argument('value', type=float)
 
-    # Connect Pi
-    parser_connect_pi = subparsers.add_parser('connect-pi', help='Connect to Raspberry Pi by IP')
-    parser_connect_pi.add_argument('ip', type=str, help='Raspberry Pi IP address')
+    parser_toggle = subparsers.add_parser('toggle-range', help='Toggle automatic compress/release')
+    parser_toggle.add_argument('state', choices=['on', 'off'])
+    parser_toggle.add_argument('--valve', type=int, help='Valve index (optional)')
+
+    parser_status = subparsers.add_parser('status', help='Get system status')
+
+    parser_connect = subparsers.add_parser('connect-pi', help='Connect to Raspberry Pi')
+    parser_connect.add_argument('ip', type=str)
 
     args = parser.parse_args()
 
@@ -61,6 +76,10 @@ def main():
         set_compressor(args.state == 'on')
     elif args.command == 'threshold':
         set_pressure_threshold(args.value)
+    elif args.command == 'lower-threshold':
+        set_lower_pressure_threshold(args.value)
+    elif args.command == 'toggle-range':
+        set_toggle_range(args.state, args.valve)
     elif args.command == 'status':
         get_status()
     elif args.command == 'connect-pi':
@@ -70,4 +89,4 @@ def main():
         sys.exit(1)
 
 if __name__ == '__main__':
-    main() 
+    main()
