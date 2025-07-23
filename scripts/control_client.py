@@ -2,7 +2,7 @@ import argparse
 import requests
 import sys
 
-CONTROL_SERVER_URL = 'http://localhost:65507'
+CONTROL_SERVER_URL = 'http://localhost:65508'
 
 def set_valve(valve_index, state):
     url = f'{CONTROL_SERVER_URL}/valve'

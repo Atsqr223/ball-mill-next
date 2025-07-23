@@ -244,5 +244,5 @@ def connect_pi():
 if __name__ == '__main__':
     t = threading.Thread(target=pressure_ws_thread, daemon=True)
     t.start()
-    print("[INFO] Control server running on port 65507...")
-    app.run(host='0.0.0.0', port=65507)
+    print("[INFO] Control server running on port 65508..")
+    app.run(host='0.0.0.0', port=65508)
