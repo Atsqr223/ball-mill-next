@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { locations, Location as LocationType } from '@/lib/locations';
 import PipelineControl from '../../../pipeline/page';
 import { useEffect, useState } from 'react';
+import WebRTCAudioReceiver from '../../../components/WebRTCAudioReceiver';
 
 export default function PipelineLocationPage() {
   const params = useParams();
@@ -71,6 +72,7 @@ useEffect(() => {
         </div>
         {/* Real-time pressure value display */}
         </div>
+        <WebRTCAudioReceiver />
       {/* All original pipeline controls and logic */}
       <PipelineControl youtubeStreamId={location.youtubeStreamId} pressure={pressure}   />
     </div>

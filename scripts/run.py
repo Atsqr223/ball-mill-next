@@ -5,11 +5,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Define the commands to run
+# commands = [
+#     "npm run dev",
+#     "python scripts/pipeline_server.py",
+#     "python scripts/audio_server.py",
+#     "python scripts/playback_server.py",
+#     "python scripts/Siemens_PLC_IO_API.py",
+#     "python scripts/pressure_server.py"  # Added pressure server
+# ]
 commands = [
     "npm run dev",
     "python scripts/pipeline_server.py",
-    "python scripts/audio_server.py",
-    "python scripts/playback_server.py",
     "python scripts/Siemens_PLC_IO_API.py",
     "python scripts/pressure_server.py"  # Added pressure server
 ]
