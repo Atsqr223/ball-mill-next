@@ -167,15 +167,14 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
   };
 
   const toggleValve = async (index: number) => {
-    if (!isConnected) return;
     setError(null);
 
-    // Update UI immediately for better responsiveness
+    // Toggle the state
     const newStates = [...valveStates];
     newStates[index] = !valveStates[index];
     setValveStates(newStates);
-    // No need to setCurrentImage here, useEffect will handle it
 
+    // Always try to update the backend, regardless of connection status
     try {
       const response = await fetch('/api/pipeline/valve', {
         method: 'POST',
@@ -184,32 +183,18 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
         },
         body: JSON.stringify({ 
           valveIndex: index,
-          state: newStates[index]  // Use the new state we just set
+          state: newStates[index]
         }),
       });
 
-      if (response.ok) {
+      if (!response.ok) {
         const data = await response.json();
-        if (data.valveStates) {
-          setValveStates(data.valveStates);
-          // No need to setCurrentImage here, useEffect will handle it
-        }
-      } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to toggle valve');
-        // Revert the state if the request failed
-        const revertStates = [...valveStates];
-        revertStates[index] = !newStates[index];
-        setValveStates(revertStates);
-        // No need to setCurrentImage here, useEffect will handle it
+        console.error('Failed to update valve state on server:', data.error || 'Unknown error');
+        // Don't revert UI state, just log the error
       }
     } catch (error) {
-      setError('Failed to toggle valve');
-      // Revert the state if the request failed
-      const revertStates = [...valveStates];
-      revertStates[index] = !newStates[index];
-      setValveStates(revertStates);
-      // No need to setCurrentImage here, useEffect will handle it
+      console.error('Error updating valve state on server:', error);
+      // Don't revert UI state on error
     }
   };
 
