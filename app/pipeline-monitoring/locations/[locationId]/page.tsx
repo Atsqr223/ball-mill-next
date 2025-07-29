@@ -72,7 +72,7 @@ useEffect(() => {
         </div>
         {/* Real-time pressure value display */}
         </div>
-        <WebRTCAudioReceiver />
+        {/*<WebRTCAudioReceiver />*/}
       {/* All original pipeline controls and logic */}
       <PipelineControl youtubeStreamId={location.youtubeStreamId} pressure={pressure}   />
     </div>

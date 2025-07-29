@@ -9,6 +9,82 @@ const SIGNALING_SERVER = "ws://20.163.22.17:65505";
 
 type AudioMode = "raw" | "processed";
 
+// Define PIXEL_COLORS and WINDOW_SIZE at the top
+const PIXEL_COLORS = [
+  'rgb(255, 99, 132)',   // Red
+  'rgb(54, 162, 235)',   // Blue
+  'rgb(255, 206, 86)',   // Yellow
+  'rgb(75, 192, 192)',   // Green
+  'rgb(153, 102, 255)',  // Purple
+  'rgb(255, 159, 64)',   // Orange
+];
+const WINDOW_SIZE = 1000;
+
+const getAnglesFromPixels = (x: number, y: number): { theta: number; phi: number } | null => {
+  // This should match the implementation in your Python code
+  // For now, we'll use a simple mapping that assumes a 2D plane
+  // You'll need to adjust this to match your actual implementation
+  const width = 50; // Adjust based on your heatmap dimensions
+  const height = 5;
+  
+  // Simple mapping from pixel to spherical coordinates
+  const theta = (x / width) * 2 * Math.PI;  // 0 to 2π
+  const phi = (y / height) * Math.PI;        // 0 to π
+  
+  return { theta, phi };
+};
+
+const applySpatialFilter = (audioData: number[][], theta: number, phi: number): { raw: number[]; filtered: number[] } => {
+  // Convert to numpy-like array for easier manipulation
+  const numSamples = audioData.length;
+  const numChannels = audioData[0].length;
+  
+  // Create a weight matrix for each channel based on angles
+  const weights = new Array(numChannels).fill(0);
+  for (let i = 0; i < numChannels; i++) {
+    // Calculate weight based on channel position
+    const channelAngle = 2 * Math.PI * i / numChannels;
+    weights[i] = Math.cos(theta - channelAngle) * Math.sin(phi);
+  }
+  
+  // Normalize weights
+  const weightSum = weights.reduce((sum, w) => sum + Math.abs(w), 0);
+  const normalizedWeights = weightSum !== 0 ? weights.map(w => w / weightSum) : weights;
+  
+  // Apply weights to each channel and sum
+  const filteredAudio = new Array(numSamples).fill(0);
+  for (let i = 0; i < numSamples; i++) {
+    for (let c = 0; c < numChannels; c++) {
+      filteredAudio[i] += audioData[i][c] * normalizedWeights[c];
+    }
+  }
+  
+  // Normalize the output
+  const maxAmplitude = Math.max(...filteredAudio.map(Math.abs));
+  const normalizedAudio = maxAmplitude > 0 
+    ? filteredAudio.map(sample => sample / maxAmplitude)
+    : filteredAudio;
+  
+  // Apply low-pass filter (simplified implementation)
+  // In a real implementation, you might want to use a proper filter library
+  const lpfCutoff = 1000; // Hz
+  const samplingRate = 48000; // Hz
+  const rc = 1.0 / (2 * Math.PI * lpfCutoff);
+  const dt = 1.0 / samplingRate;
+  const alpha = dt / (rc + dt);
+  
+  const lowPassAudio = new Array(normalizedAudio.length);
+  lowPassAudio[0] = normalizedAudio[0];
+  for (let i = 1; i < normalizedAudio.length; i++) {
+    lowPassAudio[i] = alpha * normalizedAudio[i] + (1 - alpha) * lowPassAudio[i - 1];
+  }
+  
+  return {
+    raw: normalizedAudio,
+    filtered: lowPassAudio
+  };
+};
+
 export default function WebRTCAudioReceiver() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [status, setStatus] = useState("Idle");
@@ -17,6 +93,7 @@ export default function WebRTCAudioReceiver() {
   const [selectedPixel, setSelectedPixel] = useState<{ x: number; y: number } | null>(null);
   const [audioMode, setAudioMode] = useState<AudioMode>("processed");
   const heatmapChannelRef = useRef<RTCDataChannel | null>(null);
+  const [pixelAudioData, setPixelAudioData] = useState<{ x: number; y: number; raw: Float32Array; filtered: Float32Array } | null>(null);
 
   useEffect(() => {
     const socket = io(SIGNALING_SERVER);
@@ -28,6 +105,7 @@ export default function WebRTCAudioReceiver() {
       setStatus("Connected to signaling server");
       socket.emit("ready");
     });
+
     socket.on("your-id", (id: string) => {
       setSocketId(id);
     });
@@ -45,6 +123,89 @@ export default function WebRTCAudioReceiver() {
             }
           ],
         });
+
+        peerConnection.ondatachannel = (event) => {
+          const channel = event.channel;
+
+          if (channel.label === "heatmap") {
+            heatmapChannelRef.current = channel;
+
+            channel.onmessage = (e) => {
+              try {
+                const data = JSON.parse(e.data);
+                console.log('Received data channel message:', data);
+
+                if (data.heatmap) {
+                  console.log('Setting heatmap data');
+                  setHeatmapData(data.heatmap);
+                }
+
+                // Handle raw audio data for spatial filtering
+                if (data.type === "audioData" && Array.isArray(data.channels)) {
+                  console.log('Received multi-channel audio data with', data.channels.length, 'channels and', data.channels[0]?.length || 0, 'samples');
+
+                  if (selectedPixel) {
+                    console.log('Processing audio data for pixel:', selectedPixel.x, selectedPixel.y);
+                    const angles = getAnglesFromPixels(selectedPixel.x, selectedPixel.y);
+                    if (angles) {
+                      const { theta, phi } = angles;
+                      const processed = applySpatialFilter(data.channels, theta, phi);
+                      console.log('Processed audio data - raw length:', processed.raw.length, 'filtered length:', processed.filtered.length);
+
+                      // Ensure we have valid data before updating state
+                      if (processed.raw.length > 0 && processed.filtered.length > 0) {
+                        setPixelAudioData({
+                          x: selectedPixel.x,
+                          y: selectedPixel.y,
+                          raw: new Float32Array(processed.raw),
+                          filtered: new Float32Array(processed.filtered)
+                        });
+                      } else {
+                        console.warn('Received empty audio data');
+                      }
+                    }
+                  }
+                }
+
+                // Handle pre-processed audio buffer
+                if (data.type === "audioBuffer" && data.x !== undefined && data.y !== undefined) {
+                  console.log('Received pre-processed audio buffer for pixel:', data.x, data.y, 
+                    'raw length:', data.raw?.length || 0, 
+                    'filtered length:', data.filtered?.length || 0);
+                  
+                  if ((data.raw?.length || 0) > 0 && (data.filtered?.length || 0) > 0) {
+                    setPixelAudioData({
+                      x: data.x,
+                      y: data.y,
+                      raw: new Float32Array(data.raw || []),
+                      filtered: new Float32Array(data.filtered || [])
+                    });
+                  } else {
+                    console.warn('Received empty audio buffer data');
+                  }
+                }
+              } catch (err) {
+                console.error('Error processing data channel message:', err);
+              }
+            };
+
+            channel.onopen = () => {
+              setStatus("Heatmap data channel connected");
+              console.log('Heatmap data channel opened');
+            };
+
+            channel.onclose = () => {
+              setStatus(prev => prev + " | Heatmap channel closed");
+              console.log('Heatmap data channel closed');
+            };
+
+            channel.onerror = (error) => {
+              console.error('Data channel error:', error);
+              setStatus(prev => prev + ` | Error: ${error.toString()}`);
+            };
+          }
+        };
+
         remoteStream = new MediaStream();
         peerConnection.ontrack = (event) => {
           remoteStream!.addTrack(event.track);
@@ -53,34 +214,16 @@ export default function WebRTCAudioReceiver() {
             audioRef.current.play();
           }
         };
+
         peerConnection.onicecandidate = (event) => {
           if (event.candidate && senderId) {
             socket.emit("signal", { target: senderId, message: { candidate: event.candidate } });
           }
         };
-        setStatus("Created RTCPeerConnection");
 
-        peerConnection.ondatachannel = (event) => {
-          if (event.channel.label === "heatmap") {
-            const channel = event.channel;
-            heatmapChannelRef.current = channel;
-            channel.onmessage = (e) => {
-              try {
-                const data = JSON.parse(e.data);
-                if (data.heatmap) {
-                  setHeatmapData(data.heatmap);
-                }
-              } catch (err) {}
-            };
-            channel.onopen = () => {
-              setStatus((s) => s + " | Heatmap channel open");
-            };
-            channel.onclose = () => {
-              setStatus((s) => s + " | Heatmap channel closed");
-            };
-          }
-        };
+        setStatus("Created RTCPeerConnection");
       }
+
       if (message.sdp) {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(message.sdp));
         if (message.sdp.type === "answer") {
@@ -106,12 +249,50 @@ export default function WebRTCAudioReceiver() {
     if (selectedPixel && heatmapChannelRef.current && heatmapChannelRef.current.readyState === "open") {
       const msg = JSON.stringify({ type: "pixel", x: selectedPixel.x, y: selectedPixel.y, mode: audioMode });
       heatmapChannelRef.current.send(msg);
+
+      // Clear previous audio data when selecting a new pixel
+      setPixelAudioData(null);
     }
   }, [selectedPixel, audioMode]);
 
   // Handler for pixel click
   const handlePixelClick = (x: number, y: number) => {
+    console.log('Pixel clicked:', x, y);
     setSelectedPixel({ x, y });
+    
+    // Request audio data for this pixel
+    if (heatmapChannelRef.current?.readyState === 'open') {
+      const msg = JSON.stringify({ 
+        type: 'getAudioData',
+        x: x,
+        y: y
+      });
+      console.log('Sending audio data request:', msg);
+      heatmapChannelRef.current.send(msg);
+    }
+  };
+
+  // Play the buffer using Web Audio API
+  const playBuffer = (buffer: number[] | Float32Array) => {
+    if (!buffer || buffer.length === 0) return;
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioBuffer = audioContext.createBuffer(1, buffer.length, 44100);
+    const arr = buffer instanceof Float32Array ? buffer : new Float32Array(buffer);
+    audioBuffer.copyToChannel(arr, 0);
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+    source.start();
+    source.onended = () => {
+      audioContext.close();
+    };
+  };
+
+  // Handler for play button
+  const handlePlay = (type: 'raw' | 'filtered') => {
+    if (!pixelAudioData) return;
+    const arr = type === 'filtered' ? pixelAudioData.filtered : pixelAudioData.raw;
+    playBuffer(arr);
   };
 
   return (
@@ -119,11 +300,26 @@ export default function WebRTCAudioReceiver() {
       <h3>WebRTC Audio Receiver</h3>
       <p>Status: {status}</p>
       <p>Socket ID: {socketId}</p>
-      <audio ref={audioRef} controls autoPlay />
+      <audio ref={audioRef} controls autoPlay style={{ display: 'none' }} />
       <div style={{ marginTop: 24 }}>
         <h4>Live Heatmap</h4>
         {heatmapData ? (
-          <HeatMap data={heatmapData} onPixelClick={handlePixelClick} selectedPixels={selectedPixel ? [selectedPixel] : []} />
+          <HeatMap
+            data={heatmapData}
+            onPixelClick={handlePixelClick}
+            selectedPixels={selectedPixel ? [{
+              x: selectedPixel.x,
+              y: selectedPixel.y,
+              color: "black", // Use first color for now
+              audioData: pixelAudioData ? {
+                raw: Array.from(pixelAudioData.raw),
+                filtered: Array.from(pixelAudioData.filtered)
+              } : null,
+              isPlaying: false,
+              windowSize: WINDOW_SIZE
+            }] : []}
+            onPlay={handlePlay}
+          />
         ) : (
           <p>Waiting for heatmap data...</p>
         )}
@@ -157,4 +353,4 @@ export default function WebRTCAudioReceiver() {
       </div>
     </div>
   );
-} 
+}

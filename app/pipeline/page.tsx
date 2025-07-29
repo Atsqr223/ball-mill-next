@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import Image from 'next/image';
 import { HeatMap } from '@/components/ui/heatmap';
 import { cn } from '@/lib/utils';
+import WebRTCAudioReceiver from '../components/WebRTCAudioReceiver';
 
 export interface PipelineControlProps {
   youtubeStreamId?: string;
@@ -31,12 +32,14 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
   const [pipeOverlayScale, setPipeOverlayScale] = useState(1.0); // Example: 1.0 = 100%
   const [pipeOverlayTranslate, setPipeOverlayTranslate] = useState({ x: 0, y: 0 }); // Example: { x: 0, y: 0 }
   const [heatmapTranslate, setHeatmapTranslate] = useState({ x: 0, y: 0 }); // Example: { x: 0, y: 0 }
+  const [webRTCTranslate, setWebRTCTranslate] = useState({ x: 0, y: 0 });
 
   // Example: set initial values for testing
   useEffect(() => {
     setPipeOverlayScale(0.77);
     setPipeOverlayTranslate({ x: -210, y: -150 });
     setHeatmapTranslate({ x: 30, y: 182 });
+    setWebRTCTranslate({ x: -3, y: 30 });
   }, []);
 
   // Check connection status periodically
@@ -400,13 +403,14 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 relative">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               Acoustics Guided Localization
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
+         {/*
             {!isAudioServerRunning && (
               <div className="bg-yellow-50 text-yellow-700 p-4 rounded-md mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -427,10 +431,21 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
                 {heatmapError}
               </div>
             )}
+        */}
             <div className="relative aspect-video rounded-lg overflow-hidden border">
-              {/* Heatmap below, with adjustable translation */}
+              {/* WebRTC Overlay - Positioned absolutely to overlap */}
               <div
-                className="w-full h-full absolute top-0 left-0 z-10"
+                className="absolute top-0 left-0 w-full h-full z-10"
+                style={{
+                  transform: `translate(${webRTCTranslate.x}px, ${webRTCTranslate.y}px)`
+                }}
+              >
+                <WebRTCAudioReceiver />
+              </div>
+              
+              {/* Heatmap with adjustable translation */}
+              <div
+                className="w-full h-full absolute top-0 left-0 z-30 pointer-events-none"
                 style={{
                   transform: `translate(${heatmapTranslate.x}px, ${heatmapTranslate.y}px)`
                 }}
@@ -455,11 +470,6 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
                   className="object-contain opacity-40"
                 />
               </div>
-              {/*
-                To adjust the pipe overlay alignment, change the values of pipeOverlayScale and pipeOverlayTranslate above.
-                To adjust the heatmap position, change heatmapTranslate.
-                Example: setPipeOverlayScale(0.7); setPipeOverlayTranslate({ x: 50, y: 30 }); setHeatmapTranslate({ x: 20, y: 10 });
-              */}
             </div>
           </CardContent>
         </Card>
