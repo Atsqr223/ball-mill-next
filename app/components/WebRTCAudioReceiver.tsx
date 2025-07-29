@@ -94,6 +94,7 @@ export default function WebRTCAudioReceiver() {
   const [audioMode, setAudioMode] = useState<AudioMode>("processed");
   const heatmapChannelRef = useRef<RTCDataChannel | null>(null);
   const [pixelAudioData, setPixelAudioData] = useState<{ x: number; y: number; raw: Float32Array; filtered: Float32Array } | null>(null);
+  const [sessionEnded, setSessionEnded] = useState(false);
 
   useEffect(() => {
     const socket = io(SIGNALING_SERVER);
@@ -172,14 +173,19 @@ export default function WebRTCAudioReceiver() {
                   console.log('Received pre-processed audio buffer for pixel:', data.x, data.y, 
                     'raw length:', data.raw?.length || 0, 
                     'filtered length:', data.filtered?.length || 0);
-                  
                   if ((data.raw?.length || 0) > 0 && (data.filtered?.length || 0) > 0) {
-                    setPixelAudioData({
-                      x: data.x,
-                      y: data.y,
-                      raw: new Float32Array(data.raw || []),
-                      filtered: new Float32Array(data.filtered || [])
-                    });
+                    // Only set audio data if it matches the currently selected pixel
+                    if (selectedPixel && data.x === selectedPixel.x && data.y === selectedPixel.y) {
+                      setPixelAudioData({
+                        x: data.x,
+                        y: data.y,
+                        raw: new Float32Array(data.raw || []),
+                        filtered: new Float32Array(data.filtered || [])
+                      });
+                      setSessionEnded(true);
+                    } else {
+                      console.warn('Received audio buffer for non-selected pixel:', data.x, data.y);
+                    }
                   } else {
                     console.warn('Received empty audio buffer data');
                   }
@@ -249,9 +255,11 @@ export default function WebRTCAudioReceiver() {
     if (selectedPixel && heatmapChannelRef.current && heatmapChannelRef.current.readyState === "open") {
       const msg = JSON.stringify({ type: "pixel", x: selectedPixel.x, y: selectedPixel.y, mode: audioMode });
       heatmapChannelRef.current.send(msg);
-
-      // Clear previous audio data when selecting a new pixel
+      // Also request audio data for this pixel
+      // const audioMsg = JSON.stringify({ type: 'getAudioData', x: selectedPixel.x, y: selectedPixel.y });
+      // heatmapChannelRef.current.send(audioMsg);
       setPixelAudioData(null);
+      console.log('Sent pixel selection and audio data request (effect):', msg, audioMsg);
     }
   }, [selectedPixel, audioMode]);
 
@@ -259,16 +267,20 @@ export default function WebRTCAudioReceiver() {
   const handlePixelClick = (x: number, y: number) => {
     console.log('Pixel clicked:', x, y);
     setSelectedPixel({ x, y });
-    
-    // Request audio data for this pixel
+    setPixelAudioData(null); // Clear previous audio data
+    // Send pixel selection/mode to sender
     if (heatmapChannelRef.current?.readyState === 'open') {
-      const msg = JSON.stringify({ 
-        type: 'getAudioData',
-        x: x,
-        y: y
-      });
-      console.log('Sending audio data request:', msg);
+      const msg = JSON.stringify({ type: 'pixel', x, y, mode: audioMode });
       heatmapChannelRef.current.send(msg);
+      // Add a short delay before requesting audio data
+      setTimeout(() => {
+        if (heatmapChannelRef.current?.readyState === 'open') {
+          const audioMsg = JSON.stringify({ type: 'getAudioData', x, y });
+          heatmapChannelRef.current.send(audioMsg);
+          console.log('Sent audio data request (delayed):', audioMsg);
+        }
+      }, 100); // 100ms delay
+      console.log('Sent pixel selection:', msg);
     }
   };
 
@@ -302,6 +314,11 @@ export default function WebRTCAudioReceiver() {
       <p>Socket ID: {socketId}</p>
       <audio ref={audioRef} controls autoPlay style={{ display: 'none' }} />
       <div style={{ marginTop: 24 }}>
+        {sessionEnded && (
+          <div style={{ color: 'red', fontWeight: 'bold', marginBottom: 16 }}>
+            Session ended. Please refresh the page to start a new session.
+          </div>
+        )}
         <h4>Live Heatmap</h4>
         {heatmapData ? (
           <HeatMap

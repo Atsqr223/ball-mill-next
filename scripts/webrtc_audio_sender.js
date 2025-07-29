@@ -150,7 +150,7 @@ async function createPeerConnection(target) {
   // --- END HEATMAP DATA CHANNEL ---
 
   // Listen for pixel selection/mode from frontend
-  heatmapChannel.onmessage = (e) => {
+  heatmapChannel.onmessage = async (e) => {
     try {
       const msg = JSON.parse(e.data);
       if (msg.type === 'pixel') {
@@ -160,6 +160,46 @@ async function createPeerConnection(target) {
         // Restart audio streaming with new selection
         if (audioTimer) clearInterval(audioTimer);
         startAudioStreaming();
+      } else if (msg.type === 'getAudioData') {
+        // Respond to frontend request for audio data for a pixel
+        try {
+          const res = await axios.get(`${DAQ_SERVER}/audio_data`);
+          if (!res.data || !res.data.audio_data) return;
+          let samples = res.data.audio_data;
+          if (Array.isArray(samples[0]) && samples[0].length !== undefined && samples.length < samples[0].length) {
+            samples = samples[0].map((_, c) => samples.map(r => r[c]));
+          }
+          // Process audio for the requested pixel
+          const filtered = spatialFilter(samples, msg.x, msg.y);
+          const raw = samples.map(row => row[0]);
+          if (heatmapChannel && heatmapChannel.readyState === 'open') {
+            heatmapChannel.send(JSON.stringify({
+              type: 'audioBuffer',
+              x: msg.x,
+              y: msg.y,
+              raw: raw,
+              filtered: filtered
+            }));
+            // Close the connection after sending audioBuffer
+            setTimeout(() => {
+              try {
+                if (heatmapChannel && heatmapChannel.readyState === 'open') {
+                  heatmapChannel.close();
+                }
+                if (peerConnection && peerConnection.connectionState !== 'closed') {
+                  peerConnection.close();
+                }
+                console.log('Closed data channel and peer connection after sending audioBuffer.');
+              } catch (closeErr) {
+                console.error('Error closing connection:', closeErr);
+              }
+            }, 200); // Give 200ms for message to flush
+          } else {
+            console.warn('Cannot send audioBuffer: heatmapChannel not open');
+          }
+        } catch (err2) {
+          console.error('Error sending audioBuffer:', err2);
+        }
       }
     } catch (err) {}
   };

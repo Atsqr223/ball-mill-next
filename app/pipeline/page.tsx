@@ -433,7 +433,7 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
             )}
         */}
             <div className="relative aspect-video rounded-lg overflow-hidden border">
-              {/* WebRTC Overlay - Positioned absolutely to overlap */}
+              {/* WebRTC Audio Receiver now handles both heatmap and audio plotting */}
               <div
                 className="absolute top-0 left-0 w-full h-full z-10"
                 style={{
@@ -441,19 +441,6 @@ export default function PipelineControl({ youtubeStreamId = 'jfKfPfyJRdk', press
                 }}
               >
                 <WebRTCAudioReceiver />
-              </div>
-              
-              {/* Heatmap with adjustable translation */}
-              <div
-                className="w-full h-full absolute top-0 left-0 z-30 pointer-events-none"
-                style={{
-                  transform: `translate(${heatmapTranslate.x}px, ${heatmapTranslate.y}px)`
-                }}
-              >
-                <HeatMap
-                  data={heatmapData}
-                  className="w-full h-full"
-                />
               </div>
               {/* Pipe image overlay with adjustable transform */}
               <div

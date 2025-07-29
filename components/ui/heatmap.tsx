@@ -50,7 +50,7 @@ interface HeatMapProps {
   className?: string;
   onPixelClick?: (x: number, y: number) => void;
   onPlay?: (type: 'raw' | 'filtered') => void;
-  selectedPixels?: { x: number; y: number }[];
+  selectedPixels?: SelectedPixel[];
 }
 
 // Add type guard
@@ -59,25 +59,27 @@ function isFullSelectedPixel(pixel: any): pixel is SelectedPixel {
 }
 
 export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels: externalSelectedPixels }: HeatMapProps) {
+  // If externalSelectedPixels is provided, disable all internal pixel selection logic.
+  const pixelSelectionDisabled = !!externalSelectedPixels;
   const [selectedPixels, setSelectedPixels] = useState<SelectedPixel[]>([]);
   const [error, setError] = useState<string | null>(null);
   const WINDOW_SIZE = 1000;  // Show 1000 points in the window
   // Add scroll positions for each selected pixel
   const [scrollPositions, setScrollPositions] = useState<{ [key: string]: number }>({});
 
-  // Update audio data for selected pixels
-  useEffect(() => {
-    if (selectedPixels.length === 0) return;
+  // Only use internal state if externalSelectedPixels is not provided
+  const selectedPixelList: SelectedPixel[] = externalSelectedPixels && Array.isArray(externalSelectedPixels)
+    ? externalSelectedPixels.filter(isFullSelectedPixel)
+    : selectedPixels;
 
+  // Update audio data for selected pixels (only if not using externalSelectedPixels)
+  useEffect(() => {
+    if (externalSelectedPixels) return;
+    if (selectedPixels.length === 0) return;
     const updateAudioData = async () => {
       try {
         const updatedPixels = await Promise.all(
           selectedPixels.map(async (pixel) => {
-            // Only update if the pixel is still selected
-            if (!selectedPixels.some(p => p.x === pixel.x && p.y === pixel.y)) {
-              return pixel;
-            }
-
             const response = await fetch('/api/pipeline/playback/select', {
               method: 'POST',
               headers: {
@@ -85,45 +87,30 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
               },
               body: JSON.stringify({ x: pixel.x, y: pixel.y }),
             });
-
-            if (!response.ok) {
-              throw new Error('Failed to update audio data');
-            }
-
-            const data = await response.json();
-            return {
-              ...pixel,
-              audioData: data.audio_data,
-              windowSize: WINDOW_SIZE
-            };
+            const respData = await response.json();
+            return response.ok ? { ...pixel, audioData: respData.audio_data } : pixel;
           })
         );
-
-        // Only update state if we still have selected pixels
-        if (selectedPixels.length > 0) {
-          setSelectedPixels(updatedPixels);
-        }
+        setSelectedPixels(updatedPixels);
       } catch (err) {
         console.error('Error updating audio data:', err);
       }
     };
-
-    // Update every 100ms
     const interval = setInterval(updateAudioData, 100);
     return () => clearInterval(interval);
-  }, [selectedPixels]);
+  }, [selectedPixels, externalSelectedPixels]);
 
-  // Update scroll positions if new pixels are added
+  // Update scroll positions for selected pixels (only if not using externalSelectedPixels)
   useEffect(() => {
+    if (externalSelectedPixels) return;
     setScrollPositions((prev) => {
       const updated = { ...prev };
       selectedPixels.forEach((pixel) => {
         const key = `${pixel.x},${pixel.y}`;
         if (!(key in updated)) {
-          updated[key] = 0; // Start at the beginning
+          updated[key] = 0;
         }
       });
-      // Remove scroll positions for deselected pixels
       Object.keys(updated).forEach((key) => {
         if (!selectedPixels.some(p => `${p.x},${p.y}` === key)) {
           delete updated[key];
@@ -131,7 +118,7 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
       });
       return updated;
     });
-  }, [selectedPixels]);
+  }, [selectedPixels, externalSelectedPixels]);
 
   if (!data) return null;
 
@@ -160,10 +147,12 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
     data.map(row => row[colIndex])
   );
 
+  // Internal pixel selection logic is only enabled if not using externalSelectedPixels
   const handlePixelClick = async (x: number, y: number) => {
+    if (pixelSelectionDisabled) return;
     try {
       setError(null);
-      
+      // ...existing code for local selection/deselection...
       // Check if pixel is already selected
       const existingPixelIndex = selectedPixels.findIndex(p => p.x === x && p.y === y);
       if (existingPixelIndex !== -1) {
@@ -175,17 +164,13 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
           },
           body: JSON.stringify({ x, y }),
         });
-
         if (!response.ok) {
           const error = await response.json();
           throw new Error(error.error || 'Failed to deselect pixel');
         }
-
-        // Remove the pixel from the selected pixels array
         setSelectedPixels(prevPixels => prevPixels.filter((_, index) => index !== existingPixelIndex));
         return;
       }
-
       // Select new pixel
       const response = await fetch('/api/pipeline/playback/select', {
         method: 'POST',
@@ -194,28 +179,19 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
         },
         body: JSON.stringify({ x, y }),
       });
-
       const data = await response.json();
-      
       if (!response.ok) {
-        // Handle specific error cases
         if (response.status === 503) {
-          // Server not ready or buffer empty - retry after a delay
           console.log('Server not ready, retrying in 1 second...');
           setTimeout(() => handlePixelClick(x, y), 1000);
           return;
         }
-        // Show the actual error message from the server
         throw new Error(data.error || 'Failed to select pixel');
       }
-
-      // Add the new pixel to the selected pixels array
       setSelectedPixels(prevPixels => {
-        // Check if this pixel is already in the array (shouldn't happen, but just in case)
         if (prevPixels.some(p => p.x === x && p.y === y)) {
           return prevPixels;
         }
-        
         const colorIndex = prevPixels.length % PIXEL_COLORS.length;
         return [
           ...prevPixels,
@@ -351,8 +327,7 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
     );
   };
 
-  // Use external selectedPixels if provided
-  const selectedPixelList = externalSelectedPixels || selectedPixels;
+  // (already declared above)
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -373,7 +348,10 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
                     transition: 'background-color 0.1s ease',
                     borderColor: isFullSelectedPixel(selectedPixel) ? selectedPixel.color : undefined,
                   }}
-                  onClick={() => onPixelClick ? onPixelClick(colIndex, rowIndex) : handlePixelClick(colIndex, rowIndex)}
+                  onClick={() => pixelSelectionDisabled
+                    ? (onPixelClick && onPixelClick(colIndex, rowIndex))
+                    : handlePixelClick(colIndex, rowIndex)
+                  }
                 />
               );
             })}
@@ -390,12 +368,12 @@ export function HeatMap({ data, className, onPixelClick, onPlay, selectedPixels:
       {selectedPixelList.length > 0 && (
         <div className="max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {selectedPixelList.map((pixel, index) => {
+            {selectedPixelList.filter(isFullSelectedPixel).map((pixel, index) => {
               const key = `${pixel.x},${pixel.y}`;
               return (
                 <div key={key} className="bg-white rounded-lg shadow-lg p-4">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold" style={{ color: isFullSelectedPixel(pixel) ? pixel.color : 'transparent' }}>
+                    <h3 className="text-lg font-semibold" style={{ color: pixel.color }}>
                       Pixel ({pixel.x}, {pixel.y})
                     </h3>
                     {renderPlayButton(pixel)}
