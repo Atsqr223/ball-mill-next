@@ -26,7 +26,8 @@ export default function PipelineLocationPage() {
 
   // WebSocket connection for real-time pressure
   useEffect(() => {
-    const ws = new WebSocket('ws://0.0.0.0:65506');
+  const websocketUrl = process.env.NEXT_PUBLIC_PRESSURE_WS_URL || 'ws://0.0.0.0:65506';
+  const ws = new WebSocket(websocketUrl)
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
